@@ -1,11 +1,8 @@
-import numpy as np
+import dgl
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-import dgl.function as fn
 from dgl.nn.pytorch.softmax import edge_softmax
-from dgl.nn.pytorch.conv import SAGEConv
-import math
 
 
 def _L2_loss_mean(x):
@@ -27,11 +24,39 @@ class Aggregator(nn.Module):
             self.W = nn.Linear(self.in_dim, self.out_dim)       # W in formula (6)
         elif aggregator_type == 'graphsage':
             self.W = nn.Linear(self.in_dim * 2, self.out_dim)   # W in formula (7)
-        elif self.aggregator_type == 'bi-interaction':
+        elif aggregator_type == 'bi-interaction':
             self.W1 = nn.Linear(self.in_dim, self.out_dim)      # W1 in formula (8)
             self.W2 = nn.Linear(self.in_dim, self.out_dim)      # W2 in formula (8)
         else:
             raise NotImplementedError
+
+        self.activation = nn.LeakyReLU()
+
+
+    def forwad(self, g, entity_embed):
+        g = g.local_var()
+        g.ndata['node'] = entity_embed
+        # formula (3) & (10)
+        g.update_all(dgl.function.u_mul_e('node', 'att', 'side'), dgl.function.sum('side', 'N_h'))
+
+        if self.aggregator_type == 'gcn':
+            # formula (6) & (9)
+            out = self.activation(self.W(g.ndata['node'] + g.ndata['N_h']))                         # (n_users + n_entities, out_dim)
+
+        elif self.aggregator_type == 'graphsage':
+            # formula (7) & (9)
+            out = self.activation(self.W(torch.cat([g.ndata['node'], g.ndata['N_h']], dim=1)))      # (n_users + n_entities, out_dim)
+
+        elif self.aggregator_type == 'bi-interaction':
+            # formula (8) & (9)
+            out1 = self.activation(self.W1(g.ndata['node'] + g.ndata['N_h']))                       # (n_users + n_entities, out_dim)
+            out2 = self.activation(self.W2(g.ndata['node'] * g.ndata['N_h']))                       # (n_users + n_entities, out_dim)
+            out = out1 + out2
+        else:
+            raise NotImplementedError
+
+        out = self.message_dropout(out)
+        return out
 
 
 class KGAT(nn.Module):
@@ -40,12 +65,10 @@ class KGAT(nn.Module):
                  n_users,
                  n_entities, entity_dim,
                  n_relations, relation_dim,
-                 weight_dim_list, mess_dropout, A_in, aggregation_type,
+                 conv_dim_list, mess_dropout, aggregation_type,
                  kg_l2loss_lambda, cf_l2loss_lambda):
 
         super(KGAT, self).__init__()
-
-        self.A_in = A_in
 
         self.n_users = n_users
         self.n_entities = n_entities
@@ -54,32 +77,43 @@ class KGAT(nn.Module):
         self.entity_dim = entity_dim
         self.relation_dim = relation_dim
 
-        self.weight_dim_list = [entity_dim] + weight_dim_list
-        self.n_layers = len(weight_dim_list) - 1
+        self.conv_dim_list = [entity_dim] + conv_dim_list
+        self.mess_dropout = mess_dropout
+        self.n_layers = len(conv_dim_list) - 1
 
         self.kg_l2loss_lambda = kg_l2loss_lambda
         self.cf_l2loss_lambda = cf_l2loss_lambda
 
-        self.user_embed = nn.Embedding(n_users, entity_dim)
-        self.entity_embed = nn.Embedding(n_entities, entity_dim)
+        self.user_entity_embed = nn.Embedding(n_users + n_entities, entity_dim)
         self.relation_embed = nn.Embedding(n_relations, relation_dim)
 
-        self.W_r = nn.Parameter(torch.Tensor(n_relations, entity_dim, relation_dim))
-        nn.init.xavier_uniform(self.W_r, gain=nn.init.calculate_gain('relu'))
+        self.W_R = nn.Parameter(torch.Tensor(n_relations, entity_dim, relation_dim))
+        nn.init.xavier_uniform(self.W_R, gain=nn.init.calculate_gain('relu'))
 
-        self.attention_weights = {}
-        for k in range(1, self.n_layers + 1):
-            if aggregation_type == 'gcn':
-                self.attention_weights['W_gcn_%d' % k] = nn.Linear(self.weight_dim_list[k - 1], self.weight_dim_list[k])               # W in formula (6)
-            elif aggregation_type == 'graphsage':
-                self.attention_weights['W_graphsage_%d' % k] = nn.Linear(self.weight_dim_list[k - 1] * 2, self.weight_dim_list[k])     # W in formula (7)
-            elif self.aggregation_type == 'bi-interaction':
-                self.attention_weights['W_bi1_%d' % k] = nn.Linear(self.weight_dim_list[k - 1], self.weight_dim_list[k])               # W1 in formula (8)
-                self.attention_weights['W_bi2_%d' % k] = nn.Linear(self.weight_dim_list[k - 1], self.weight_dim_list[k])               # W2 in formula (8)
+        self.aggregator_layers = nn.ModuleList()
+        for k in range(self.n_layers):
+            self.aggregator_layers.append(Aggregator(self.conv_dim_list[k], self.conv_dim_list[k + 1], self.mess_dropout[k], aggregation_type))
 
-        self.mess_drops = {}
-        for k in range(1, self.n_layers + 1):
-            self.mess_drops[k] = nn.Dropout(mess_dropout[k - 1])
+
+    def att_score(self, edges):
+        # formula (4)
+        r_mul_t = torch.matmul(self.user_entity_embed(edges.src['id']), self.W_r)                       # (n_edge, relation_dim)
+        r_mul_h = torch.matmul(self.user_entity_embed(edges.dst['id']), self.W_r)                       # (n_edge, relation_dim)
+        r_embed = self.relation_embed(edges.data['type'])                                               # (1, relation_dim)
+        att = torch.bmm(r_mul_t.unsqueeze(1), torch.tanh(r_mul_h + r_embed).unsqueeze(2)).squeeze(-1)   # (n_edge, 1)
+        return {'att': att}
+
+
+    def compute_attention(self, g):
+        g = g.local_var()
+        for i in range(self.n_relations):
+            edge_idxs = g.filter_edges(lambda edge: edge.data['type'] == i)
+            self.W_r = self.W_R[i]
+            g.apply_edges(self.att_score, edge_idxs)
+
+        # formula (5)
+        g.edata['att'] = edge_softmax(g, g.edata.pop('att'))
+        return g.edata.pop('att')
 
 
     def create_gcn_embed(self):
@@ -174,37 +208,70 @@ class KGAT(nn.Module):
         return loss
 
 
-    def kg_embedding(self, h, r, pos_t, neg_t):
-        r_embed = self.relation_embed(r)            # (batch_size, relation_dim)
-        r_trans_M = self.W_r.index_select(0, r)     # (batch_size, entity_dim, relation_dim)
+    def ckg_embedding(self, h, r, pos_t, neg_t):
+        """
+        h:      (ckg_batch_size)
+        r:      (ckg_batch_size)
+        pos_t:  (ckg_batch_size)
+        neg_t:  (ckg_batch_size)
+        """
+        r_embed = self.relation_embed(r)                 # (ckg_batch_size, relation_dim)
+        W_r = self.W_R[r]                                # (ckg_batch_size, entity_dim, relation_dim)
 
-        h_embed = self.entity_embed(h)              # (batch_size, entity_dim)
-        pos_t_embed = self.entity_embed(pos_t)      # (batch_size, entity_dim)
-        neg_t_embed = self.entity_embed(neg_t)      # (batch_size, entity_dim)
+        h_embed = self.user_entity_embed(h)              # (ckg_batch_size, entity_dim)
+        pos_t_embed = self.user_entity_embed(pos_t)      # (ckg_batch_size, entity_dim)
+        neg_t_embed = self.user_entity_embed(neg_t)      # (ckg_batch_size, entity_dim)
 
-        h_e = torch.bmm(h_embed.unsqueeze(1), r_trans_M).squeeze(1)             # (batch_size, relation_dim)
-        pos_t_e = torch.bmm(pos_t_embed.unsqueeze(1), r_trans_M).squeeze(1)     # (batch_size, relation_dim)
-        neg_t_e = torch.bmm(neg_t_embed.unsqueeze(1), r_trans_M).squeeze(1)     # (batch_size, relation_dim)
-        return h_e, pos_t_e, neg_t_e, r_embed
+        r_mul_h = torch.bmm(h_embed.unsqueeze(1), W_r).squeeze(1)             # (ckg_batch_size, relation_dim)
+        r_mul_pos_t = torch.bmm(pos_t_embed.unsqueeze(1), W_r).squeeze(1)     # (ckg_batch_size, relation_dim)
+        r_mul_neg_t = torch.bmm(neg_t_embed.unsqueeze(1), W_r).squeeze(1)     # (ckg_batch_size, relation_dim)
 
-
-    def kg_loss(self, h_e, r_e, pos_t_e, neg_t_e):
         # formula (1)
-        pos_score = torch.sum(torch.pow(h_e + r_e - pos_t_e, 2), dim=1, keepdim=True)     # (batch_size, 1)
-        neg_score = torch.sum(torch.pow(h_e + r_e - neg_t_e, 2), dim=1, keepdim=True)     # (batch_size, 1)
+        pos_score = torch.sum(torch.pow(r_mul_h + r_embed - r_mul_pos_t, 2), dim=1, keepdim=True)     # (ckg_batch_size, 1)
+        neg_score = torch.sum(torch.pow(r_mul_h + r_embed - r_mul_neg_t, 2), dim=1, keepdim=True)     # (ckg_batch_size, 1)
 
         # formula (2)
         kg_loss = (-1.0) * F.logsigmoid(neg_score - pos_score)
         kg_loss = torch.mean(kg_loss)
 
-        l2_loss = _L2_loss_mean(h_e) + _L2_loss_mean(r_e) + _L2_loss_mean(pos_t_e) + _L2_loss_mean(neg_t_e)
+        l2_loss = _L2_loss_mean(r_mul_h) + _L2_loss_mean(r_embed) + _L2_loss_mean(r_mul_pos_t) + _L2_loss_mean(r_mul_neg_t)
         loss = kg_loss + self.kg_l2loss_lambda * l2_loss
         return loss
 
 
-    def attention_score(self, h_e, r_e, t_e):
-        pass
+    def attention_embedding(self, g, user_ids, item_pos_ids, item_neg_ids):
+        """
+        user_ids:       (att_batch_size)
+        item_pos_ids:   (att_batch_size)
+        item_neg_ids:   (att_batch_size)
+        """
+        g = g.local_var()
+        ego_embed = self.user_entity_embed(g.ndata['id'])
+        all_embed = [ego_embed]
 
+        for i, layer in enumerate(self.aggregator_layers):
+            ego_embed = layer(g, ego_embed)
+            norm_embed = F.normalize(ego_embed, p=2, dim=1)
+            all_embed.append(norm_embed)
+
+        # formula (11)
+        all_embed = torch.cat(all_embed, dim=1)
+
+        user_embed = all_embed[user_ids]            # (att_batch_size, attention_concat_dim)
+        item_pos_embed = all_embed[item_pos_ids]    # (att_batch_size, attention_concat_dim)
+        item_neg_embed = all_embed[item_neg_ids]    # (att_batch_size, attention_concat_dim)
+
+        # formula (12)
+        pos_score = torch.sum(user_embed * item_pos_embed, dim=1)       # (att_batch_size)
+        neg_score = torch.sum(user_embed * item_neg_embed, dim=1)       # (att_batch_size)
+
+        # formula (13)
+        cf_loss = (-1.0) * F.logsigmoid(pos_score - neg_score)
+        cf_loss = torch.mean(cf_loss)
+
+        l2_loss = _L2_loss_mean(user_embed) + _L2_loss_mean(item_pos_embed) + _L2_loss_mean(item_neg_embed)
+        loss = cf_loss + self.cf_l2loss_lambda * l2_loss
+        return loss
 
 
 
