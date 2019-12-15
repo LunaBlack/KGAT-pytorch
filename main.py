@@ -16,7 +16,7 @@ from utility.helper import *
 from utility.load_data import DataLoader
 
 
-def eval(model, train_graph, train_user_dict, test_user_dict, item_ids, K, use_cuda, device):
+def evaluate(model, train_graph, train_user_dict, test_user_dict, item_ids, K, use_cuda, device):
     model.eval()
 
     with torch.no_grad():
@@ -29,8 +29,8 @@ def eval(model, train_graph, train_user_dict, test_user_dict, item_ids, K, use_c
         user_ids = user_ids.to(device)
 
     cf_scores = model.cf_score(train_graph, user_ids, item_ids)       # (n_eval_users, n_eval_items)
-    recall, ndcg = calc_recall_ndcg(cf_scores, train_user_dict, test_user_dict, user_ids, item_ids, K, use_cuda)
-    return recall, ndcg
+    precision_k, recall_k, ndcg_k = calc_metrics_at_k(cf_scores, train_user_dict, test_user_dict, user_ids, item_ids, K, use_cuda)
+    return precision_k, recall_k, ndcg_k
 
 
 def train(args):
@@ -39,7 +39,7 @@ def train(args):
     np.random.seed(args.seed)
     torch.manual_seed(args.seed)
 
-    logging_config(folder=args.save_dir, name='log{:d}'.format(args.save_id), no_console=False)
+    logging_config(folder=args.log_dir, name='log{:d}'.format(args.save_id), no_console=False)
     logging.info(args)
 
     # GPU / CPU
@@ -90,6 +90,7 @@ def train(args):
         item_ids = item_ids.to(device)
 
     # initialize metrics
+    precision_list = []
     recall_list = []
     ndcg_list = []
 
@@ -155,9 +156,10 @@ def train(args):
         # evaluate cf
         if (epoch % args.evaluate_every) == 0:
             time1 = time()
-            recall, ndcg = eval(model, train_graph, data.train_user_dict, data.test_user_dict, item_ids, args.K, use_cuda, device)
+            precision, recall, ndcg = evaluate(model, train_graph, data.train_user_dict, data.test_user_dict, item_ids, args.K, use_cuda, device)
             logging.info('CF Evaluation: Epoch {:04d} | Total Time {:.1f}s | Recall {:.4f} NDCG {:.4f}'.format(epoch, time() - time1, recall, ndcg))
 
+            precision_list.append(precision)
             recall_list.append(recall)
             ndcg_list.append(ndcg)
             best_recall, should_stop = early_stopping(recall_list, args.stopping_steps)
@@ -166,11 +168,11 @@ def train(args):
                 break
 
             if best_recall == recall_list[-1]:
-                save_model(model, model_dir, epoch)
+                save_model(model, args.model_dir, epoch)
                 logging.info('Save model on epoch {:04d}!'.format(epoch))
 
     # save model
-    save_model(model, model_dir, args.n_epoch)
+    save_model(model, args.model_dir, args.n_epoch)
 
     recall, ndcg = eval(model, train_graph, data.train_user_dict, data.test_user_dict, item_ids, args.K, use_cuda)
     logging.info('Final CF Evaluation: Recall {:.4f} NDCG {:.4f}'.format(recall, ndcg))

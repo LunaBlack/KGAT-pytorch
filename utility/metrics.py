@@ -81,7 +81,7 @@ def logloss(ground_truth, prediction):
     return logloss
 
 
-def calc_recall_ndcg(cf_scores, train_user_dict, test_user_dict, user_ids, item_ids, K, use_cuda):
+def calc_metrics_at_k(cf_scores, train_user_dict, test_user_dict, user_ids, item_ids, K, use_cuda):
     """
     cf_scores: (n_eval_users, n_eval_items)
     """
@@ -94,6 +94,7 @@ def calc_recall_ndcg(cf_scores, train_user_dict, test_user_dict, user_ids, item_
         item_ids = item_ids.numpy()
         cf_scores = cf_scores
 
+    precision_all = []
     recall_all = []
     ndcg_all = []
 
@@ -111,15 +112,18 @@ def calc_recall_ndcg(cf_scores, train_user_dict, test_user_dict, user_ids, item_
             if rank_indices[idx] in test_pos_item_list:
                 binary_hit[idx] = 1
 
+        precision = precision_at_k(binary_hit, K)
         recall = recall_at_k(binary_hit, K, len(test_pos_item_list))
         ndcg = ndcg_at_k(binary_hit, K)
 
+        precision_all.append(precision)
         recall_all.append(recall)
         ndcg_all.append(ndcg)
 
+    precision_mean = sum(precision_all) / len(precision_all)
     recall_mean = sum(recall_all) / len(recall_all)
     ndcg_mean = sum(ndcg_all) / len(ndcg_all)
-    return recall_mean, ndcg_mean
+    return precision_mean, recall_mean, ndcg_mean
 
 
 
