@@ -61,44 +61,46 @@ class Aggregator(nn.Module):
 
 class KGAT(nn.Module):
 
-    def __init__(self,
-                 n_users,
-                 n_entities, entity_dim,
-                 n_relations, relation_dim,
-                 conv_dim_list, mess_dropout, aggregation_type,
-                 kg_l2loss_lambda, cf_l2loss_lambda):
+    def __init__(self, args, user_pre_embed=None, item_pre_embed=None):
 
         super(KGAT, self).__init__()
+        self.use_pretrain = args.use_pretrain
 
-        self.n_users = n_users
-        self.n_entities = n_entities
-        self.n_relations = n_relations
+        self.n_users = args.n_users
+        self.n_entities = args.n_entities
+        self.n_relations = args.n_relations
 
-        self.entity_dim = entity_dim
-        self.relation_dim = relation_dim
+        self.entity_dim = args.entity_dim
+        self.relation_dim = args.relation_dim
 
-        self.conv_dim_list = [entity_dim] + conv_dim_list
-        self.mess_dropout = mess_dropout
-        self.n_layers = len(conv_dim_list)
+        self.aggregation_type = args.aggregation_type
+        self.conv_dim_list = [args.entity_dim] + args.conv_dim_list
+        self.mess_dropout = args.mess_dropout
+        self.n_layers = len(args.conv_dim_list)
 
-        self.kg_l2loss_lambda = kg_l2loss_lambda
-        self.cf_l2loss_lambda = cf_l2loss_lambda
+        self.kg_l2loss_lambda = args.kg_l2loss_lambda
+        self.cf_l2loss_lambda = args.cf_l2loss_lambda
 
-        self.user_entity_embed = nn.Embedding(n_users + n_entities, entity_dim)
-        self.relation_embed = nn.Embedding(n_relations, relation_dim)
+        self.relation_embed = nn.Embedding(self.n_relations, self.relation_dim)
+        self.entity_user_embed = nn.Embedding(self.n_entities + self.n_users, self.entity_dim)
+        if self.use_pretrain:
+            other_entity_embed = nn.Parameter(torch.Tensor(self.n_entities - item_pre_embed.shape[0], self.entity_dim))
+            nn.init.xavier_uniform_(other_entity_embed, gain=nn.init.calculate_gain('relu'))
+            entity_user_embed = torch.cat([item_pre_embed, other_entity_embed, user_pre_embed], dim=0)
+            self.entity_user_embed.weight = nn.Parameter(entity_user_embed)
 
-        self.W_R = nn.Parameter(torch.Tensor(n_relations, entity_dim, relation_dim))
+        self.W_R = nn.Parameter(torch.Tensor(self.n_relations, self.entity_dim, self.relation_dim))
         nn.init.xavier_uniform(self.W_R, gain=nn.init.calculate_gain('relu'))
 
         self.aggregator_layers = nn.ModuleList()
         for k in range(self.n_layers):
-            self.aggregator_layers.append(Aggregator(self.conv_dim_list[k], self.conv_dim_list[k + 1], self.mess_dropout[k], aggregation_type))
+            self.aggregator_layers.append(Aggregator(self.conv_dim_list[k], self.conv_dim_list[k + 1], self.mess_dropout[k], self.aggregation_type))
 
 
     def att_score(self, edges):
         # formula (4)
-        r_mul_t = torch.matmul(self.user_entity_embed(edges.src['id']), self.W_r)                       # (n_edge, relation_dim)
-        r_mul_h = torch.matmul(self.user_entity_embed(edges.dst['id']), self.W_r)                       # (n_edge, relation_dim)
+        r_mul_t = torch.matmul(self.entity_user_embed(edges.src['id']), self.W_r)                       # (n_edge, relation_dim)
+        r_mul_h = torch.matmul(self.entity_user_embed(edges.dst['id']), self.W_r)                       # (n_edge, relation_dim)
         r_embed = self.relation_embed(edges.data['type'])                                               # (1, relation_dim)
         att = torch.bmm(r_mul_t.unsqueeze(1), torch.tanh(r_mul_h + r_embed).unsqueeze(2)).squeeze(-1)   # (n_edge, 1)
         return {'att': att}
@@ -126,9 +128,9 @@ class KGAT(nn.Module):
         r_embed = self.relation_embed(r)                 # (kg_batch_size, relation_dim)
         W_r = self.W_R[r]                                # (kg_batch_size, entity_dim, relation_dim)
 
-        h_embed = self.user_entity_embed(h)              # (kg_batch_size, entity_dim)
-        pos_t_embed = self.user_entity_embed(pos_t)      # (kg_batch_size, entity_dim)
-        neg_t_embed = self.user_entity_embed(neg_t)      # (kg_batch_size, entity_dim)
+        h_embed = self.entity_user_embed(h)              # (kg_batch_size, entity_dim)
+        pos_t_embed = self.entity_user_embed(pos_t)      # (kg_batch_size, entity_dim)
+        neg_t_embed = self.entity_user_embed(neg_t)      # (kg_batch_size, entity_dim)
 
         r_mul_h = torch.bmm(h_embed.unsqueeze(1), W_r).squeeze(1)             # (kg_batch_size, relation_dim)
         r_mul_pos_t = torch.bmm(pos_t_embed.unsqueeze(1), W_r).squeeze(1)     # (kg_batch_size, relation_dim)
@@ -152,7 +154,7 @@ class KGAT(nn.Module):
         entity_ids:  (cf_batch_size)
         """
         g = g.local_var()
-        ego_embed = self.user_entity_embed(g.ndata['id'])
+        ego_embed = self.entity_user_embed(g.ndata['id'])
         all_embed = [ego_embed]
 
         for i, layer in enumerate(self.aggregator_layers):
@@ -168,14 +170,14 @@ class KGAT(nn.Module):
 
     def cf_score(self, g, user_ids, item_ids):
         """
-        user_ids:   (cf_batch_size)
-        item_ids:   (cf_batch_size)
+        user_ids:   number of users to evaluate   (n_eval_users)
+        item_ids:   number of items to evaluate   (n_eval_items)
         """
-        user_embed = self.cf_embedding(g, user_ids)             # (cf_batch_size, cf_concat_dim)
-        item_embed = self.cf_embedding(g, item_ids)             # (cf_batch_size, cf_concat_dim)
+        user_embed = self.cf_embedding(g, user_ids)             # (n_eval_users, cf_concat_dim)
+        item_embed = self.cf_embedding(g, item_ids)             # (n_eval_items, cf_concat_dim)
 
         # formula (12)
-        cf_score = torch.sum(user_embed * item_embed, dim=1)    # (cf_batch_size)
+        cf_score = torch.matmul(user_embed, item_embed.transpose(0, 1))    # (n_eval_users, n_eval_items)
         return cf_score
 
 

@@ -35,6 +35,9 @@ class DataLoader(object):
         self.train_graph = self.create_graph(self.kg_train_data, self.n_users_entities)
         self.test_graph = self.create_graph(self.kg_test_data, self.n_users_entities)
 
+        if self.use_pretrain:
+            self.load_pretrained_data()
+
 
     def load_cf(self, filename):
         user = []
@@ -197,6 +200,10 @@ class DataLoader(object):
         for u in batch_user:
             batch_pos_item += self.sample_pos_items_for_u(user_dict, u, 1)
             batch_neg_item += self.sample_neg_items_for_u(user_dict, u, 1)
+
+        batch_user = torch.LongTensor(batch_user)
+        batch_pos_item = torch.LongTensor(batch_pos_item)
+        batch_neg_item = torch.LongTensor(batch_neg_item)
         return batch_user, batch_pos_item, batch_neg_item
 
 
@@ -248,9 +255,25 @@ class DataLoader(object):
 
             neg_tail = self.sample_neg_triples_for_h(kg_dict, h, relation[0], 1)
             batch_neg_tail += neg_tail
+
+        batch_head = torch.LongTensor(batch_head)
+        batch_relation = torch.LongTensor(batch_relation)
+        batch_pos_tail = torch.LongTensor(batch_pos_tail)
+        batch_neg_tail = torch.LongTensor(batch_neg_tail)
         return batch_head, batch_relation, batch_pos_tail, batch_neg_tail
 
 
+    def load_pretrained_data(self):
+        pre_model = 'mf'
+        pretrain_path = '%s/%s/%s.npz' % (self.pretrain_dir, self.data_name, pre_model)
+        pretrain_data = np.load(pretrain_path)
+        self.user_pre_embed = pretrain_data['user_embed']
+        self.item_pre_embed = pretrain_data['item_embed']
+
+        assert self.user_pre_embed.shape[0] == self.n_users
+        assert self.item_pre_embed.shape[0] == self.n_items
+        assert self.user_pre_embed.shape[1] == self.args.entity_dim
+        assert self.item_pre_embed.shape[1] == self.args.entity_dim
 
 
 
