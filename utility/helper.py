@@ -16,3 +16,16 @@ def early_stopping(log_value, best_value, stopping_step, expected_order='acc', f
     return best_value, stopping_step, should_stop
 
 
+
+def early_stopping(recall_list, stopping_steps):
+    pass
+
+
+def save_model(model, model_dir, epoch_idx):
+    pass
+
+
+
+
+
+

@@ -16,7 +16,7 @@ from utility.helper import *
 from utility.load_data import DataLoader
 
 
-def eval(model, train_graph, train_user_dict, test_user_dict, item_ids, K, use_cuda):
+def eval(model, train_graph, train_user_dict, test_user_dict, item_ids, K, use_cuda, device):
     model.eval()
 
     with torch.no_grad():
@@ -24,8 +24,12 @@ def eval(model, train_graph, train_user_dict, test_user_dict, item_ids, K, use_c
     train_graph.edata['att'] = att
 
     user_ids = test_user_dict.keys()
-    cf_scores = model.cf_score(g, user_ids, item_ids)       # (n_eval_users, n_eval_items)
-    recall, ndcg = metrics.calc_recall_ndcg(cf_scores, train_user_dict, test_user_dict, user_ids, item_ids, K, use_cuda)
+    user_ids = torch.LongTensor(list(user_ids))
+    if use_cuda:
+        user_ids = user_ids.to(device)
+
+    cf_scores = model.cf_score(train_graph, user_ids, item_ids)       # (n_eval_users, n_eval_items)
+    recall, ndcg = calc_recall_ndcg(cf_scores, train_user_dict, test_user_dict, user_ids, item_ids, K, use_cuda)
     return recall, ndcg
 
 
@@ -151,7 +155,7 @@ def train(args):
         # evaluate cf
         if (epoch % args.evaluate_every) == 0:
             time1 = time()
-            recall, ndcg = eval(model, train_graph, data.train_user_dict, data.test_user_dict, item_ids, args.K, use_cuda)
+            recall, ndcg = eval(model, train_graph, data.train_user_dict, data.test_user_dict, item_ids, args.K, use_cuda, device)
             logging.info('CF Evaluation: Epoch {:04d} | Total Time {:.1f}s | Recall {:.4f} NDCG {:.4f}'.format(epoch, time() - time1, recall, ndcg))
 
             recall_list.append(recall)
