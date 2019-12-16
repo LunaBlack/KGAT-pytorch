@@ -13,13 +13,12 @@ class DataLoader(object):
     def __init__(self, args):
         self.args = args
         self.data_name = args.data_name
-        self.use_KG = args.use_KG
         self.use_pretrain = args.use_pretrain
 
         self.cf_batch_size = args.cf_batch_size
         self.kg_batch_size = args.kg_batch_size
 
-        data_dir = args.data_dir
+        data_dir = os.path.join(args.data_dir, args.data_name)
         train_file = os.path.join(data_dir, 'train.txt')
         test_file = os.path.join(data_dir, 'test.txt')
         kg_file = os.path.join(data_dir, "kg_final.txt")
@@ -66,8 +65,8 @@ class DataLoader(object):
     def statistic_cf(self):
         self.n_users = max(max(self.cf_train_data[0]), max(self.cf_test_data[0])) + 1
         self.n_items = max(max(self.cf_train_data[1]), max(self.cf_test_data[1])) + 1
-        self.n_cf_train = len(self.cf_train_data)
-        self.n_cf_test = len(self.cf_test_data)
+        self.n_cf_train = len(self.cf_train_data[0])
+        self.n_cf_test = len(self.cf_test_data[0])
 
 
     def load_kg(self, filename):
@@ -82,7 +81,7 @@ class DataLoader(object):
         reverse_kg_data = kg_data.copy()
         reverse_kg_data = reverse_kg_data.rename({'h': 't', 't': 'h'}, axis='columns')
         reverse_kg_data['r'] += n_relations
-        kg_data = pd.concat([kg_data, reverse_kg_data], ignore_index=True)
+        kg_data = pd.concat([kg_data, reverse_kg_data], axis=0, ignore_index=True, sort=False)
 
         # re-map user id
         kg_data['r'] += 2

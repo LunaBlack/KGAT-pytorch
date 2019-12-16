@@ -61,22 +61,24 @@ class Aggregator(nn.Module):
 
 class KGAT(nn.Module):
 
-    def __init__(self, args, user_pre_embed=None, item_pre_embed=None):
+    def __init__(self, args,
+                 n_users, n_entities, n_relations,
+                 user_pre_embed=None, item_pre_embed=None):
 
         super(KGAT, self).__init__()
         self.use_pretrain = args.use_pretrain
 
-        self.n_users = args.n_users
-        self.n_entities = args.n_entities
-        self.n_relations = args.n_relations
+        self.n_users = n_users
+        self.n_entities = n_entities
+        self.n_relations = n_relations
 
         self.entity_dim = args.entity_dim
         self.relation_dim = args.relation_dim
 
         self.aggregation_type = args.aggregation_type
-        self.conv_dim_list = [args.entity_dim] + args.conv_dim_list
-        self.mess_dropout = args.mess_dropout
-        self.n_layers = len(args.conv_dim_list)
+        self.conv_dim_list = [args.entity_dim] + eval(args.conv_dim_list)
+        self.mess_dropout = eval(args.mess_dropout)
+        self.n_layers = len(eval(args.conv_dim_list))
 
         self.kg_l2loss_lambda = args.kg_l2loss_lambda
         self.cf_l2loss_lambda = args.cf_l2loss_lambda

@@ -8,4 +8,5 @@ datasets/yelp2018/_rel_entity_freq
 datasets/yelp2018/_rel_ecount
 *.pyc
 __pycache__
+trained_model/
 

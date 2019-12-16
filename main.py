@@ -39,7 +39,8 @@ def train(args):
     np.random.seed(args.seed)
     torch.manual_seed(args.seed)
 
-    logging_config(folder=args.log_dir, name='log{:d}'.format(args.save_id), no_console=False)
+    log_save_id = create_log_id(args.save_dir)
+    logging_config(folder=args.save_dir, name='log{:d}'.format(log_save_id), no_console=False)
     logging.info(args)
 
     # GPU / CPU
@@ -58,7 +59,7 @@ def train(args):
         user_pre_embed, item_pre_embed = None, None
 
     # construct model & optimizer
-    model = KGAT(args, user_pre_embed, item_pre_embed)
+    model = KGAT(args, data.n_users, data.n_entities, data.n_relations, user_pre_embed, item_pre_embed)
     model.to(device)
     if n_gpu > 1:
         model = torch.nn.DataParallel(model)
@@ -168,11 +169,11 @@ def train(args):
                 break
 
             if best_recall == recall_list[-1]:
-                save_model(model, args.model_dir, epoch)
+                save_model(model, args.save_dir, epoch)
                 logging.info('Save model on epoch {:04d}!'.format(epoch))
 
     # save model
-    save_model(model, args.model_dir, args.n_epoch)
+    save_model(model, args.save_dir, args.n_epoch)
 
     recall, ndcg = eval(model, train_graph, data.train_user_dict, data.test_user_dict, item_ids, args.K, use_cuda)
     logging.info('Final CF Evaluation: Recall {:.4f} NDCG {:.4f}'.format(recall, ndcg))
