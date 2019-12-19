@@ -100,7 +100,7 @@ def calc_metrics_at_k(cf_scores, train_user_dict, test_user_dict, user_ids, item
 
     for user_id, test_pos_item_list in test_user_dict.items():
         user_idx = np.where(user_ids == user_id)[0][0]
-        train_pos_item_list = train_user_dict[user_idx]
+        train_pos_item_list = train_user_dict[user_id]
 
         user_scores = cf_scores[user_idx]
         for item_id in train_pos_item_list:
@@ -109,7 +109,7 @@ def calc_metrics_at_k(cf_scores, train_user_dict, test_user_dict, user_ids, item
         _, rank_indices = torch.sort(user_scores, descending=True)
         binary_hit = np.zeros(len(item_ids), dtype=np.float32)
         for idx in range(len(item_ids)):
-            if rank_indices[idx] in test_pos_item_list:
+            if rank_indices[idx].item() in test_pos_item_list:
                 binary_hit[idx] = 1
 
         precision = precision_at_k(binary_hit, K)

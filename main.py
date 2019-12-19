@@ -51,7 +51,7 @@ def train(args):
         torch.cuda.manual_seed_all(args.seed)
 
     # load data
-    data = DataLoader(args)
+    data = DataLoader(args, logging)
     if args.use_pretrain:
         user_pre_embed = torch.tensor(data.user_pre_embed)
         item_pre_embed = torch.tensor(data.item_pre_embed)
@@ -63,6 +63,8 @@ def train(args):
     model.to(device)
     if n_gpu > 1:
         model = torch.nn.DataParallel(model)
+    if isinstance(model, torch.nn.DataParallel):
+        model = model.module
     logging.info(model)
 
     optimizer = optim.Adam(model.parameters(), lr=args.lr)
@@ -104,6 +106,7 @@ def train(args):
         with torch.no_grad():
             att = model.compute_attention(train_graph)
         train_graph.edata['att'] = att
+        logging.info('Update attention scores: Epoch {:04d} | Total Time {:.1f}s'.format(epoch, time() - time0))
 
         # train cf
         time1 = time()
@@ -125,7 +128,7 @@ def train(args):
             cf_total_loss += cf_batch_loss.item()
 
             if (iter % args.cf_print_every) == 0:
-                logging.info('CF Training: Epoch {:04d} Iter {:04d} | Time {:.1f}s | Iter Loss {:.4f} | Iter Mean Loss {:.4f}'.format(epoch, iter, time() - time2, cf_batch_loss.item(), cf_total_loss / iter))
+                logging.info('CF Training: Epoch {:04d} Iter {:04d} / {:04d} | Time {:.1f}s | Iter Loss {:.4f} | Iter Mean Loss {:.4f}'.format(epoch, iter, n_cf_batch, time() - time2, cf_batch_loss.item(), cf_total_loss / iter))
         logging.info('CF Training: Epoch {:04d} Total Iter {:04d} | Total Time {:.1f}s | Iter Mean Loss {:.4f}'.format(epoch, n_cf_batch, time() - time1, cf_total_loss / n_cf_batch))
 
         # train kg
@@ -149,7 +152,7 @@ def train(args):
             kg_total_loss += kg_batch_loss.item()
 
             if (iter % args.kg_print_every) == 0:
-                logging.info('KG Training: Epoch {:04d} Iter {:04d} | Time {:.1f}s | Iter Loss {:.4f} | Iter Mean Loss {:.4f}'.format(epoch, iter, time() - time2, kg_batch_loss.item(), kg_total_loss / iter))
+                logging.info('KG Training: Epoch {:04d} Iter {:04d} / {:04d} | Time {:.1f}s | Iter Loss {:.4f} | Iter Mean Loss {:.4f}'.format(epoch, iter, n_kg_batch, time() - time2, kg_batch_loss.item(), kg_total_loss / iter))
         logging.info('KG Training: Epoch {:04d} Total Iter {:04d} | Total Time {:.1f}s | Iter Mean Loss {:.4f}'.format(epoch, n_kg_batch, time() - time1, kg_total_loss / n_kg_batch))
 
         logging.info('CF + KG Training: Epoch {:04d} | Total Time {:.1f}s'.format(epoch, time() - time0))
@@ -158,7 +161,7 @@ def train(args):
         if (epoch % args.evaluate_every) == 0:
             time1 = time()
             precision, recall, ndcg = evaluate(model, train_graph, data.train_user_dict, data.test_user_dict, item_ids, args.K, use_cuda, device)
-            logging.info('CF Evaluation: Epoch {:04d} | Total Time {:.1f}s | Recall {:.4f} NDCG {:.4f}'.format(epoch, time() - time1, recall, ndcg))
+            logging.info('CF Evaluation: Epoch {:04d} | Total Time {:.1f}s | Precision {:.4f} Recall {:.4f} NDCG {:.4f}'.format(epoch, time() - time1, precision, recall, ndcg))
 
             precision_list.append(precision)
             recall_list.append(recall)
@@ -175,8 +178,8 @@ def train(args):
     # save model
     save_model(model, args.save_dir, args.n_epoch)
 
-    recall, ndcg = eval(model, train_graph, data.train_user_dict, data.test_user_dict, item_ids, args.K, use_cuda)
-    logging.info('Final CF Evaluation: Recall {:.4f} NDCG {:.4f}'.format(recall, ndcg))
+    precision, recall, ndcg = evaluate(model, train_graph, data.train_user_dict, data.test_user_dict, item_ids, args.K, use_cuda, device)
+    logging.info('Final CF Evaluation: Precision {:.4f} Recall {:.4f} NDCG {:.4f}'.format(precision, recall, ndcg))
 
 
 

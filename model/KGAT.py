@@ -33,7 +33,7 @@ class Aggregator(nn.Module):
         self.activation = nn.LeakyReLU()
 
 
-    def forwad(self, g, entity_embed):
+    def forward(self, g, entity_embed):
         g = g.local_var()
         g.ndata['node'] = entity_embed
         # formula (3) & (10)

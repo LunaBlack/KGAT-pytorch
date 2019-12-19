@@ -41,6 +41,8 @@ def parse_args():
                         help='Learning rate.')
     parser.add_argument('--n_epoch', type=int, default=100,
                         help='Number of epoch.')
+    parser.add_argument('--stopping_steps', type=int, default=10,
+                        help='Number of epoch for early stopping')
     parser.add_argument('--cf_print_every', type=int, default=1,
                         help='Iter interval of printing CF loss.')
     parser.add_argument('--kg_print_every', type=int, default=1,

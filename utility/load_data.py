@@ -10,7 +10,7 @@ import pandas as pd
 
 class DataLoader(object):
 
-    def __init__(self, args):
+    def __init__(self, args, logging):
         self.args = args
         self.data_name = args.data_name
         self.use_pretrain = args.use_pretrain
@@ -30,7 +30,7 @@ class DataLoader(object):
         kg_data = self.load_kg(kg_file)
         self.construct_data(kg_data)
 
-        self.print_info()
+        self.print_info(logging)
         self.train_graph = self.create_graph(self.kg_train_data, self.n_users_entities)
         self.test_graph = self.create_graph(self.kg_test_data, self.n_users_entities)
 
@@ -134,18 +134,18 @@ class DataLoader(object):
             self.test_relation_dict[r].append((h, t))
 
 
-    def print_info(self):
-        print('n_users:             ', self.n_users)
-        print('n_items:             ', self.n_items)
-        print('n_entities:          ', self.n_entities)
-        print('n_users_entities:    ', self.n_users_entities)
-        print('n_relations:         ', self.n_relations)
+    def print_info(self, logging):
+        logging.info('n_users:            %d' % self.n_users)
+        logging.info('n_items:            %d' % self.n_items)
+        logging.info('n_entities:         %d' % self.n_entities)
+        logging.info('n_users_entities:   %d' % self.n_users_entities)
+        logging.info('n_relations:        %d' % self.n_relations)
 
-        print('n_cf_train:          ', self.n_cf_train)
-        print('n_cf_test:           ', self.n_cf_test)
+        logging.info('n_cf_train:         %d' % self.n_cf_train)
+        logging.info('n_cf_test:          %d' % self.n_cf_test)
 
-        print('n_kg_train:          ', self.n_kg_train)
-        print('n_kg_test:           ', self.n_kg_test)
+        logging.info('n_kg_train:         %d' % self.n_kg_train)
+        logging.info('n_kg_test:          %d' % self.n_kg_test)
 
 
     def create_graph(self, kg_data, n_nodes):
