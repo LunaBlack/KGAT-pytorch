@@ -19,6 +19,15 @@ def precision_at_k(hit, k):
     return np.mean(hit)
 
 
+def precision_at_k_batch(hits, k):
+    """
+    calculate Precision@k
+    hits: array, element is binary (0 / 1), 2-dim
+    """
+    res = hits[:, :k].mean(axis=1).mean()
+    return res
+
+
 def average_precision(hit, cut):
     """
     calculate average precision (area under PR curve)
@@ -52,6 +61,22 @@ def ndcg_at_k(rel, k):
     return dcg_at_k(rel, k) / idcg
 
 
+def ndcg_at_k_batch(hits, k):
+    """
+    calculate NDCG@k
+    hits: array, element is binary (0 / 1), 2-dim
+    """
+    hits_k = hits[:, :k]
+    dcg = np.sum((2 ** hits_k - 1) / np.log2(np.arange(2, k + 2)), axis=1)
+
+    sorted_hits_k = np.flip(np.sort(hits), axis=1)[:, :k]
+    idcg = np.sum((2 ** sorted_hits_k - 1) / np.log2(np.arange(2, k + 2)), axis=1)
+    idcg[idcg == 0] = np.inf
+
+    res = (dcg / idcg).mean()
+    return res
+
+
 def recall_at_k(hit, k, all_pos_num):
     """
     calculate Recall@k
@@ -59,6 +84,15 @@ def recall_at_k(hit, k, all_pos_num):
     """
     hit = np.asfarray(hit)[:k]
     return np.sum(hit) / all_pos_num
+
+
+def recall_at_k_batch(hits, k):
+    """
+    calculate Recall@k
+    hits: array, element is binary (0 / 1), 2-dim
+    """
+    res = (hits[:, :k].sum(axis=1) / hits.sum(axis=1)).mean()
+    return res
 
 
 def F1(pre, rec):
@@ -94,36 +128,23 @@ def calc_metrics_at_k(cf_scores, train_user_dict, test_user_dict, user_ids, item
         item_ids = item_ids.numpy()
         cf_scores = cf_scores
 
-    precision_all = []
-    recall_all = []
-    ndcg_all = []
-
+    test_pos_item_binary = np.zeros([len(user_ids), len(item_ids)], dtype=np.float32)
     for user_id, test_pos_item_list in test_user_dict.items():
         user_idx = np.where(user_ids == user_id)[0][0]
         train_pos_item_list = train_user_dict[user_id]
+        cf_scores[user_idx][train_pos_item_list] = 0
+        test_pos_item_binary[user_idx][test_pos_item_list] = 1
+    _, rank_indices = torch.sort(cf_scores, descending=True)
 
-        user_scores = cf_scores[user_idx]
-        for item_id in train_pos_item_list:
-            user_scores[item_id] = 0
+    binary_hit = []
+    for i in range(len(user_ids)):
+        binary_hit.append(test_pos_item_binary[i][rank_indices[i]])
+    binary_hit = np.array(binary_hit, dtype=np.float32)
 
-        _, rank_indices = torch.sort(user_scores, descending=True)
-        binary_hit = np.zeros(len(item_ids), dtype=np.float32)
-        for idx in range(len(item_ids)):
-            if rank_indices[idx].item() in test_pos_item_list:
-                binary_hit[idx] = 1
-
-        precision = precision_at_k(binary_hit, K)
-        recall = recall_at_k(binary_hit, K, len(test_pos_item_list))
-        ndcg = ndcg_at_k(binary_hit, K)
-
-        precision_all.append(precision)
-        recall_all.append(recall)
-        ndcg_all.append(ndcg)
-
-    precision_mean = sum(precision_all) / len(precision_all)
-    recall_mean = sum(recall_all) / len(recall_all)
-    ndcg_mean = sum(ndcg_all) / len(ndcg_all)
-    return precision_mean, recall_mean, ndcg_mean
+    precision = precision_at_k_batch(binary_hit, K)
+    recall = recall_at_k_batch(binary_hit, K)
+    ndcg = ndcg_at_k_batch(binary_hit, K)
+    return precision, recall, ndcg
 
 
 

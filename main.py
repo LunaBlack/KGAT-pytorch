@@ -176,7 +176,7 @@ def train(args):
                 logging.info('Save model on epoch {:04d}!'.format(epoch))
 
     # save model
-    save_model(model, args.save_dir, args.n_epoch)
+    save_model(model, args.save_dir, epoch)
 
     precision, recall, ndcg = evaluate(model, train_graph, data.train_user_dict, data.test_user_dict, item_ids, args.K, use_cuda, device)
     logging.info('Final CF Evaluation: Precision {:.4f} Recall {:.4f} NDCG {:.4f}'.format(precision, recall, ndcg))

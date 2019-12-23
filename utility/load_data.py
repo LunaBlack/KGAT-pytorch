@@ -14,6 +14,7 @@ class DataLoader(object):
         self.args = args
         self.data_name = args.data_name
         self.use_pretrain = args.use_pretrain
+        self.pretrain_dir = args.pretrain_dir
 
         self.cf_batch_size = args.cf_batch_size
         self.kg_batch_size = args.kg_batch_size
