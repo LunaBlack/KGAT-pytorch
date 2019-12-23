@@ -30,7 +30,7 @@ def evaluate(model, train_graph, train_user_dict, test_user_dict, item_ids, K, u
 
     cf_scores = model.cf_score(train_graph, user_ids, item_ids)       # (n_eval_users, n_eval_items)
     precision_k, recall_k, ndcg_k = calc_metrics_at_k(cf_scores, train_user_dict, test_user_dict, user_ids, item_ids, K, use_cuda)
-    return precision_k, recall_k, ndcg_k
+    return cf_scores, precision_k, recall_k, ndcg_k
 
 
 def train(args):
@@ -52,7 +52,7 @@ def train(args):
 
     # load data
     data = DataLoader(args, logging)
-    if args.use_pretrain:
+    if args.use_pretrain == 1:
         user_pre_embed = torch.tensor(data.user_pre_embed)
         item_pre_embed = torch.tensor(data.item_pre_embed)
     else:
@@ -60,6 +60,9 @@ def train(args):
 
     # construct model & optimizer
     model = KGAT(args, data.n_users, data.n_entities, data.n_relations, user_pre_embed, item_pre_embed)
+    if args.use_pretrain == 2:
+        model = load_model(model, args.pretrain_model_path)
+
     model.to(device)
     if n_gpu > 1:
         model = torch.nn.DataParallel(model)
@@ -162,7 +165,7 @@ def train(args):
         # evaluate cf
         if (epoch % args.evaluate_every) == 0:
             time1 = time()
-            precision, recall, ndcg = evaluate(model, train_graph, data.train_user_dict, data.test_user_dict, item_ids, args.K, use_cuda, device)
+            _, precision, recall, ndcg = evaluate(model, train_graph, data.train_user_dict, data.test_user_dict, item_ids, args.K, use_cuda, device)
             logging.info('CF Evaluation: Epoch {:04d} | Total Time {:.1f}s | Precision {:.4f} Recall {:.4f} NDCG {:.4f}'.format(epoch, time() - time1, precision, recall, ndcg))
 
             epoch_list.append(epoch)
@@ -183,7 +186,7 @@ def train(args):
     save_model(model, args.save_dir, epoch)
 
     # save metrics
-    precision, recall, ndcg = evaluate(model, train_graph, data.train_user_dict, data.test_user_dict, item_ids, args.K, use_cuda, device)
+    _, precision, recall, ndcg = evaluate(model, train_graph, data.train_user_dict, data.test_user_dict, item_ids, args.K, use_cuda, device)
     logging.info('Final CF Evaluation: Precision {:.4f} Recall {:.4f} NDCG {:.4f}'.format(precision, recall, ndcg))
 
     epoch_list.append(epoch)
@@ -194,6 +197,55 @@ def train(args):
     metrics = pd.DataFrame([epoch_list, precision_list, recall_list, ndcg_list]).transpose()
     metrics.columns = ['epoch_idx', 'precision@{}'.format(args.K), 'recall@{}'.format(args.K), 'ndcg@{}'.format(args.K)]
     metrics.to_csv(args.save_dir + '/metrics.tsv', sep='\t', index=False)
+
+
+def predict(args):
+    # GPU / CPU
+    use_cuda = torch.cuda.is_available()
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    n_gpu = torch.cuda.device_count()
+    if n_gpu > 0:
+        torch.cuda.manual_seed_all(args.seed)
+
+    # load data
+    data = DataLoader(args, logging)
+
+    # load model
+    model = KGAT(args, data.n_users, data.n_entities, data.n_relations)
+    model = load_model(model, args.pretrain_model_path)
+    model.to(device)
+    if n_gpu > 1:
+        model = torch.nn.DataParallel(model)
+    if isinstance(model, torch.nn.DataParallel):
+        model = model.module
+
+    # move graph data to GPU
+    train_graph = data.train_graph
+    train_nodes = torch.LongTensor(train_graph.ndata['id'])
+    train_edges = torch.LongTensor(train_graph.edata['type'])
+    if use_cuda:
+        train_nodes = train_nodes.to(device)
+        train_edges = train_edges.to(device)
+    train_graph.ndata['id'] = train_nodes
+    train_graph.edata['type'] = train_edges
+
+    test_graph = data.test_graph
+    test_nodes = torch.LongTensor(test_graph.ndata['id'])
+    test_edges = torch.LongTensor(test_graph.edata['type'])
+    if use_cuda:
+        test_nodes = test_nodes.to(device)
+        test_edges = test_edges.to(device)
+    test_graph.ndata['id'] = test_nodes
+    test_graph.edata['type'] = test_edges
+
+    item_ids = torch.arange(data.n_items, dtype=torch.long)
+    if use_cuda:
+        item_ids = item_ids.to(device)
+
+    # predict
+    cf_scores, precision, recall, ndcg = evaluate(model, train_graph, data.train_user_dict, data.test_user_dict, item_ids, args.K, use_cuda, device)
+    np.save(args.save_dir + 'cf_scores.npy', cf_scores.numpy())
+    print('CF Evaluation: Precision {:.4f} Recall {:.4f} NDCG {:.4f}'.format(precision, recall, ndcg))
 
 
 

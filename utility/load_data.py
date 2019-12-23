@@ -35,7 +35,7 @@ class DataLoader(object):
         self.train_graph = self.create_graph(self.kg_train_data, self.n_users_entities)
         self.test_graph = self.create_graph(self.kg_test_data, self.n_users_entities)
 
-        if self.use_pretrain:
+        if self.use_pretrain == 1:
             self.load_pretrained_data()
 
 
