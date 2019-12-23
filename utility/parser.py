@@ -13,9 +13,11 @@ def parse_args():
                         help='Input data path.')
 
     parser.add_argument('--use_pretrain', type=int, default=1,
-                        help='0: No pretrain, 1: Pretrain with the learned embeddings.')
-    parser.add_argument('--pretrain_dir', nargs='?', default='datasets/pretrain/',
+                        help='0: No pretrain, 1: Pretrain with the learned embeddings, 2: Pretrain with stored model.')
+    parser.add_argument('--pretrain_embedding_dir', nargs='?', default='datasets/pretrain/',
                         help='Path of learned embeddings.')
+    parser.add_argument('--pretrain_model_path', nargs='?', default='./',
+                        help='Path of stored model.')
 
     parser.add_argument('--cf_batch_size', type=int, default=1024,
                         help='CF batch size.')

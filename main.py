@@ -93,6 +93,8 @@ def train(args):
         item_ids = item_ids.to(device)
 
     # initialize metrics
+    best_epoch = -1
+    epoch_list = []
     precision_list = []
     recall_list = []
     ndcg_list = []
@@ -163,6 +165,7 @@ def train(args):
             precision, recall, ndcg = evaluate(model, train_graph, data.train_user_dict, data.test_user_dict, item_ids, args.K, use_cuda, device)
             logging.info('CF Evaluation: Epoch {:04d} | Total Time {:.1f}s | Precision {:.4f} Recall {:.4f} NDCG {:.4f}'.format(epoch, time() - time1, precision, recall, ndcg))
 
+            epoch_list.append(epoch)
             precision_list.append(precision)
             recall_list.append(recall)
             ndcg_list.append(ndcg)
@@ -171,15 +174,26 @@ def train(args):
             if should_stop:
                 break
 
-            if best_recall == recall_list[-1]:
-                save_model(model, args.save_dir, epoch)
+            if recall_list.index(best_recall) == len(recall_list) - 1:
+                save_model(model, args.save_dir, epoch, best_epoch)
                 logging.info('Save model on epoch {:04d}!'.format(epoch))
+                best_epoch = epoch
 
     # save model
     save_model(model, args.save_dir, epoch)
 
+    # save metrics
     precision, recall, ndcg = evaluate(model, train_graph, data.train_user_dict, data.test_user_dict, item_ids, args.K, use_cuda, device)
     logging.info('Final CF Evaluation: Precision {:.4f} Recall {:.4f} NDCG {:.4f}'.format(precision, recall, ndcg))
+
+    epoch_list.append(epoch)
+    precision_list.append(precision)
+    recall_list.append(recall)
+    ndcg_list.append(ndcg)
+
+    metrics = pd.DataFrame([epoch_list, precision_list, recall_list, ndcg_list]).transpose()
+    metrics.columns = ['epoch_idx', 'precision@{}'.format(args.K), 'recall@{}'.format(args.K), 'ndcg@{}'.format(args.K)]
+    metrics.to_csv(args.save_dir + '/metrics.tsv', sep='\t', index=False)
 
 
 

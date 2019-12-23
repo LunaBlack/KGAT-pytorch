@@ -14,7 +14,7 @@ class DataLoader(object):
         self.args = args
         self.data_name = args.data_name
         self.use_pretrain = args.use_pretrain
-        self.pretrain_dir = args.pretrain_dir
+        self.pretrain_embedding_dir = args.pretrain_embedding_dir
 
         self.cf_batch_size = args.cf_batch_size
         self.kg_batch_size = args.kg_batch_size
@@ -265,7 +265,7 @@ class DataLoader(object):
 
     def load_pretrained_data(self):
         pre_model = 'mf'
-        pretrain_path = '%s/%s/%s.npz' % (self.pretrain_dir, self.data_name, pre_model)
+        pretrain_path = '%s/%s/%s.npz' % (self.pretrain_embedding_dir, self.data_name, pre_model)
         pretrain_data = np.load(pretrain_path)
         self.user_pre_embed = pretrain_data['user_embed']
         self.item_pre_embed = pretrain_data['item_embed']
