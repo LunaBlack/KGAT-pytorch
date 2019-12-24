@@ -28,7 +28,8 @@ def evaluate(model, train_graph, train_user_dict, test_user_dict, item_ids, K, u
     if use_cuda:
         user_ids = user_ids.to(device)
 
-    cf_scores = model.cf_score(train_graph, user_ids, item_ids)       # (n_eval_users, n_eval_items)
+    with torch.no_grad():
+        cf_scores = model.cf_score(train_graph, user_ids, item_ids)       # (n_eval_users, n_eval_items)
     precision_k, recall_k, ndcg_k = calc_metrics_at_k(cf_scores, train_user_dict, test_user_dict, user_ids, item_ids, K, use_cuda)
     return cf_scores, precision_k, recall_k, ndcg_k
 
@@ -252,6 +253,7 @@ def predict(args):
 if __name__ == '__main__':
     args = parse_args()
     train(args)
+    # predict(args)
 
 
 
