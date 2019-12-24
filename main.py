@@ -245,7 +245,7 @@ def predict(args):
 
     # predict
     cf_scores, precision, recall, ndcg = evaluate(model, train_graph, data.train_user_dict, data.test_user_dict, item_ids, args.K, use_cuda, device)
-    np.save(args.save_dir + 'cf_scores.npy', cf_scores.numpy())
+    np.save(args.save_dir + 'cf_scores.npy', cf_scores.cpu().numpy())
     print('CF Evaluation: Precision {:.4f} Recall {:.4f} NDCG {:.4f}'.format(precision, recall, ndcg))
 
 
