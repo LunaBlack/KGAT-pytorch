@@ -3,6 +3,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from dgl.nn.pytorch.softmax import edge_softmax
+from utility.helper import edge_softmax_fix
 
 
 def _L2_loss_mean(x):
@@ -37,7 +38,8 @@ class Aggregator(nn.Module):
         g = g.local_var()
         g.ndata['node'] = entity_embed
         # formula (3) & (10)
-        g.update_all(dgl.function.u_mul_e('node', 'att', 'side'), dgl.function.sum('side', 'N_h'))
+        g.update_all(dgl.function.u_mul_e('node', 'att', 'side'), lambda nodes: {'N_h': torch.sum(nodes.mailbox['side'], 1)})
+        # g.update_all(dgl.function.u_mul_e('node', 'att', 'side'), dgl.function.sum('side', 'N_h'))
 
         if self.aggregator_type == 'gcn':
             # formula (6) & (9)
@@ -116,7 +118,7 @@ class KGAT(nn.Module):
             g.apply_edges(self.att_score, edge_idxs)
 
         # formula (5)
-        g.edata['att'] = edge_softmax(g, g.edata.pop('att'))
+        g.edata['att'] = edge_softmax_fix(g, g.edata.pop('att'))
         return g.edata.pop('att')
 
 

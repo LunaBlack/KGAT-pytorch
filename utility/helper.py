@@ -1,5 +1,24 @@
 import os
+import dgl
 import torch
+from dgl import function as fn
+
+
+def edge_softmax_fix(graph, score):
+    # to solve the issue on `fn.sum`
+    # it seems to get different results with `fn.sum` every time
+
+    def reduce_sum(nodes):
+        accum = torch.sum(nodes.mailbox['temp'], 1)
+        return {'out_sum': accum}
+
+    graph = graph.local_var()
+    graph.edata['out'] = score
+    graph.edata['out'] = torch.exp(graph.edata['out'])
+    graph.update_all(fn.copy_e('out', 'temp'), reduce_sum)
+    graph.apply_edges(fn.e_div_v('out', 'out_sum', 'out'))
+    out = graph.edata['out']
+    return out
 
 
 def early_stopping(recall_list, stopping_steps):

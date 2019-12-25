@@ -31,9 +31,9 @@ def parse_args():
 
     parser.add_argument('--aggregation_type', nargs='?', default='bi-interaction',
                         help='Specify the type of the aggregation layer from {gcn, graphsage, bi-interaction}.')
-    parser.add_argument('--conv_dim_list', nargs='?', default='[16, 8]',
+    parser.add_argument('--conv_dim_list', nargs='?', default='[64, 32, 16]',
                         help='Output sizes of every aggregation layer.')
-    parser.add_argument('--mess_dropout', nargs='?', default='[0.1, 0.1]',
+    parser.add_argument('--mess_dropout', nargs='?', default='[0.1, 0.1, 0.1]',
                         help='Dropout probability w.r.t. message dropout for each deep layer. 0: no dropout.')
 
     parser.add_argument('--kg_l2loss_lambda', type=float, default=1e-5,
@@ -43,7 +43,7 @@ def parse_args():
 
     parser.add_argument('--lr', type=float, default=0.0001,
                         help='Learning rate.')
-    parser.add_argument('--n_epoch', type=int, default=100,
+    parser.add_argument('--n_epoch', type=int, default=1000,
                         help='Number of epoch.')
     parser.add_argument('--stopping_steps', type=int, default=10,
                         help='Number of epoch for early stopping')
