@@ -9,11 +9,11 @@ import pandas as pd
 import torch.optim as optim
 
 from model.KGAT import KGAT
-from utility.parser import *
+from utility.parser_kgat import *
 from utility.log_helper import *
 from utility.metrics import *
 from utility.helper import *
-from utility.load_data import DataLoader
+from utility.loader_kgat import DataLoaderKGAT
 
 
 def evaluate(model, train_graph, train_user_dict, test_user_dict, item_ids, K, use_cuda, device):
@@ -52,7 +52,7 @@ def train(args):
         torch.cuda.manual_seed_all(args.seed)
 
     # load data
-    data = DataLoader(args, logging)
+    data = DataLoaderKGAT(args, logging)
     if args.use_pretrain == 1:
         user_pre_embed = torch.tensor(data.user_pre_embed)
         item_pre_embed = torch.tensor(data.item_pre_embed)
@@ -209,7 +209,7 @@ def predict(args):
         torch.cuda.manual_seed_all(args.seed)
 
     # load data
-    data = DataLoader(args, logging)
+    data = DataLoaderKGAT(args, logging)
 
     # load model
     model = KGAT(args, data.n_users, data.n_entities, data.n_relations)
@@ -251,7 +251,7 @@ def predict(args):
 
 
 if __name__ == '__main__':
-    args = parse_args()
+    args = parse_kgat_args()
     train(args)
     # predict(args)
 

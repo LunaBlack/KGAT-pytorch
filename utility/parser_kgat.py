@@ -1,7 +1,7 @@
 import argparse
 
 
-def parse_args():
+def parse_kgat_args():
     parser = argparse.ArgumentParser(description="Run KGAT.")
 
     parser.add_argument('--seed', type=int, default=123,
@@ -59,9 +59,9 @@ def parse_args():
 
     args = parser.parse_args()
 
-    save_dir = 'trained_model/{}_entitydim{}_relationdim{}_{}_{}_lr{}/'.format(
+    save_dir = 'trained_model/KGAT/{}/entitydim{}_relationdim{}_{}_{}_lr{}_pretrain{}/'.format(
         args.data_name, args.entity_dim, args.relation_dim, args.aggregation_type,
-        '-'.join([str(i) for i in eval(args.conv_dim_list)]), args.lr)
+        '-'.join([str(i) for i in eval(args.conv_dim_list)]), args.lr, args.use_pretrain)
     args.save_dir = save_dir
 
     return args
