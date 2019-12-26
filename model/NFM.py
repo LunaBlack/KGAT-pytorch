@@ -21,7 +21,7 @@ class HiddenLayer(nn.Module):
         out = self.linear(x)
         out = self.batch_norm(out)
         out = self.activation(out)
-        out = self.dropout(out)
+        out = self.message_dropout(out)
         return out
 
 
@@ -61,7 +61,11 @@ class NFM(nn.Module):
         self.dropout = nn.Dropout(self.mess_dropout[0])
 
         if self.model_type == 'fm':
-            self.h = torch.ones([self.embed_dim, 1])
+            self.h = nn.Linear(self.embed_dim, 1, bias=False)
+            with torch.no_grad():
+                self.h.weight.copy_(torch.ones([1, self.embed_dim]))
+            for param in self.h.parameters():
+                param.requires_grad = False
 
         elif self.model_type == 'nfm':
             self.hidden_layers = nn.ModuleList()
@@ -82,9 +86,11 @@ class NFM(nn.Module):
 
         # Hidden layers
         z = self.dropout(self.batch_norm(bi))               # (batch_size, embed_dim)
-        # Equation (5)
-        for i, layer in enumerate(self.n_layers):
-            z = layer(z)                                    # (batch_size, hidden_dim)
+
+        if self.model_type == 'nfm':
+            # Equation (5)
+            for i, layer in enumerate(self.hidden_layers):
+                z = layer(z)                                # (batch_size, hidden_dim)
 
         # Prediction layer
         # Equation (6)
@@ -105,51 +111,6 @@ class NFM(nn.Module):
         loss = (-1.0) * F.logsigmoid(pos_score - neg_score)
         loss = torch.mean(loss)
         return loss
-
-
-    # def predict(self, feature_idxs, feature_values):
-    #     """
-    #     feature_idxs:     (batch_size, n_features), n_features = n_entities + n_users
-    #     feature_values:   (batch_size, n_features)
-    #     """
-    #     nonzero_embed = self.feature_embed(feature_idxs)        # (batch_size, n_features, embed_dim)
-    #     feature_values = feature_values.unsqueeze(dim=-1)       # (batch_size, n_features, 1)
-    #     nonzero_embed = nonzero_embed * feature_values          # (batch_size, n_features, embed_dim)
-    #
-    #     # Bi-Interaction layer
-    #     # Equation (4) / (3)
-    #     sum_square_embed = nonzero_embed.sum(dim=1).pow(2)      # (batch_size, embed_dim)
-    #     square_sum_embed = (nonzero_embed.pow(2)).sum(dim=1)    # (batch_size, embed_dim)
-    #     bi = 0.5 * (sum_square_embed - square_sum_embed)        # (batch_size, embed_dim)
-    #
-    #     # Hidden layers
-    #     z = self.dropout(self.batch_norm(bi))                   # (batch_size, embed_dim)
-    #     # Equation (5)
-    #     for i, layer in enumerate(self.n_layers):
-    #         z = layer(z)                                        # (batch_size, hidden_dim)
-    #
-    #     # Prediction layer
-    #     # Equation (6)
-    #     y = self.h(z)                                           # (batch_size, 1)
-    #     # Equation (2) / (7) / (8)
-    #     y = self.linear(feature_values) + y                     # (batch_size, 1)
-    #     return y.squeeze()                                      # (batch_size)
-    #
-    #
-    # def cal_loss(self, pos_feature_idx, pos_feature_value, neg_feature_idx, neg_feature_value):
-    #     """
-    #     pos_feature_idx:        (batch_size, n_features)
-    #     pos_feature_value:      (batch_size, n_features)
-    #     neg_feature_idx:        (batch_size, n_features)
-    #     neg_feature_value:      (batch_size, n_features)
-    #     """
-    #     pos_score = self.predict(pos_feature_idx, pos_feature_value)    # (batch_size)
-    #     neg_score = self.predict(neg_feature_idx, neg_feature_value)    # (batch_size)
-    #
-    #     loss = (-1.0) * F.logsigmoid(pos_score - neg_score)
-    #     loss = torch.mean(loss)
-    #     return loss
-
 
 
 

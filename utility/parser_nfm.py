@@ -29,8 +29,10 @@ def parse_nfm_args():
     parser.add_argument('--mess_dropout', nargs='?', default='[0.1, 0.1]',
                         help='Dropout probability w.r.t. message dropout for bi-interaction layer and each hidden layer. 0: no dropout.')
 
-    parser.add_argument('--batch_size', type=int, default=1024,
-                        help='Batch size.')
+    parser.add_argument('--train_batch_size', type=int, default=1024,
+                        help='Train batch size.')
+    parser.add_argument('--test_batch_size', type=int, default=1048576,
+                        help='Test batch size.')
     parser.add_argument('--lr', type=float, default=0.0001,
                         help='Learning rate.')
     parser.add_argument('--n_epoch', type=int, default=1000,

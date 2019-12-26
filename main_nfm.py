@@ -8,6 +8,7 @@ import torch
 import numpy as np
 import pandas as pd
 import torch.optim as optim
+from tqdm import tqdm, trange
 
 from model.NFM import NFM
 from utility.parser_nfm import *
@@ -20,7 +21,7 @@ from utility.loader_nfm import DataLoaderNFM
 def evaluate(model, dataloader, K, use_cuda, device):
     n_items = dataloader.n_items
     n_entities = dataloader.n_entities
-    batch_size = dataloader.batch_size
+    test_batch_size = dataloader.test_batch_size
     train_user_dict = dataloader.train_user_dict
     test_user_dict = dataloader.test_user_dict
 
@@ -28,29 +29,29 @@ def evaluate(model, dataloader, K, use_cuda, device):
 
     user_ids = list(test_user_dict.keys())
     item_ids = list(range(n_items))
-    user_item_pairs = list(itertools.product(user_ids, item_ids))
+    user_item_pairs = itertools.product(user_ids, item_ids)
 
     cf_scores = torch.zeros([len(user_ids), len(item_ids)])
     if use_cuda:
         cf_scores = cf_scores.to(device)
 
-    n_batch = len(user_item_pairs) // batch_size + 1
-    for i in range(n_batch):
-        start = batch_size * i
-        end = min(batch_size * (i + 1), len(user_item_pairs))
-        if end <= start:
-            break
+    n_test_batch = len(user_ids) * len(item_ids) // test_batch_size + 1
+    with tqdm(total=n_test_batch, desc='Evaluating Iteration') as pbar:
+        while True:
+            batch_pairs = list(itertools.islice(user_item_pairs, test_batch_size))
+            if len(batch_pairs) == 0:
+                break
 
-        batch_pairs = user_item_pairs[start: end]
-        batch_user = [p[0] for p in batch_pairs]
-        batch_item = [p[1] for p in batch_pairs]
-        feature_values = dataloader.generate_test_batch(batch_user, batch_item)
-        if use_cuda:
-            feature_values = feature_values.to(device)
+            batch_user = [p[0] for p in batch_pairs]
+            batch_item = [p[1] for p in batch_pairs]
+            feature_values = dataloader.generate_test_batch(batch_user, batch_item)
+            if use_cuda:
+                feature_values = feature_values.to(device)
 
-        with torch.no_grad():
-            batch_scores = model.predict(feature_values)            # (batch_size)
-        cf_scores[[idx - n_entities for idx in batch_user], batch_item] = batch_scores
+            with torch.no_grad():
+                batch_scores = model.predict(feature_values)            # (batch_size)
+            cf_scores[[idx - n_entities for idx in batch_user], batch_item] = batch_scores
+            pbar.update(1)
 
     precision_k, recall_k, ndcg_k = calc_metrics_at_k(cf_scores, train_user_dict, test_user_dict, user_ids, item_ids, K, use_cuda)
     return cf_scores, precision_k, recall_k, ndcg_k
@@ -110,7 +111,7 @@ def train(args):
         # train cf
         time1 = time()
         total_loss = 0
-        n_batch = data.n_cf_train // data.batch_size + 1
+        n_batch = data.n_cf_train // data.train_batch_size + 1
 
         for iter in range(1, n_batch + 1):
             time2 = time()
@@ -125,7 +126,7 @@ def train(args):
             optimizer.zero_grad()
             total_loss += batch_loss.item()
 
-            if (iter % args.cf_print_every) == 0:
+            if (iter % args.print_every) == 0:
                 logging.info('CF Training: Epoch {:04d} Iter {:04d} / {:04d} | Time {:.1f}s | Iter Loss {:.4f} | Iter Mean Loss {:.4f}'.format(epoch, iter, n_batch, time() - time2, batch_loss.item(), total_loss / iter))
         logging.info('CF Training: Epoch {:04d} Total Iter {:04d} | Total Time {:.1f}s | Iter Mean Loss {:.4f}'.format(epoch, n_batch, time() - time1, total_loss / n_batch))
 

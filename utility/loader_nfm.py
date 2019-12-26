@@ -1,4 +1,5 @@
 import os
+import time
 import random
 import collections
 
@@ -13,10 +14,12 @@ class DataLoaderNFM(object):
 
     def __init__(self, args, logging):
         self.args = args
-        self.batch_size = args.batch_size
         self.data_name = args.data_name
         self.use_pretrain = args.use_pretrain
         self.pretrain_embedding_dir = args.pretrain_embedding_dir
+
+        self.train_batch_size = args.train_batch_size
+        self.test_batch_size = args.test_batch_size
 
         data_dir = os.path.join(args.data_dir, args.data_name)
         train_file = os.path.join(data_dir, 'train.txt')
@@ -153,10 +156,10 @@ class DataLoaderNFM(object):
 
     def generate_train_batch(self, user_dict):
         exist_users = user_dict.keys()
-        if self.batch_size <= len(exist_users):
-            batch_user = random.sample(exist_users, self.batch_size)
+        if self.train_batch_size <= len(exist_users):
+            batch_user = random.sample(exist_users, self.train_batch_size)
         else:
-            batch_user = [random.choice(exist_users) for _ in range(self.batch_size)]
+            batch_user = [random.choice(exist_users) for _ in range(self.train_batch_size)]
 
         batch_pos_item, batch_neg_item = [], []
         for u in batch_user:
@@ -177,7 +180,7 @@ class DataLoaderNFM(object):
 
 
     def generate_test_batch(self, batch_user, batch_item):
-        batch_user_sp = self.user_matrix[[i - self.n_entities for i in batch_user]]
+        batch_user_sp = self.user_matrix[np.array(batch_user) - self.n_entities]
         batch_item_sp = self.feat_matrix[batch_item]
         feature_values = sp.hstack([batch_item_sp, batch_user_sp])
         feature_values = self.convert_coo2tensor(feature_values.tocoo())
@@ -193,8 +196,8 @@ class DataLoaderNFM(object):
 
         assert self.user_pre_embed.shape[0] == self.n_users
         assert self.item_pre_embed.shape[0] == self.n_items
-        assert self.user_pre_embed.shape[1] == self.args.entity_dim
-        assert self.item_pre_embed.shape[1] == self.args.entity_dim
+        assert self.user_pre_embed.shape[1] == self.args.embed_dim
+        assert self.item_pre_embed.shape[1] == self.args.embed_dim
 
 
 
