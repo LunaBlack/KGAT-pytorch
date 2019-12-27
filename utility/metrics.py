@@ -129,11 +129,11 @@ def calc_metrics_at_k(cf_scores, train_user_dict, test_user_dict, user_ids, item
         cf_scores = cf_scores
 
     test_pos_item_binary = np.zeros([len(user_ids), len(item_ids)], dtype=np.float32)
-    for user_id, test_pos_item_list in test_user_dict.items():
-        user_idx = np.where(user_ids == user_id)[0][0]
-        train_pos_item_list = train_user_dict[user_id]
-        cf_scores[user_idx][train_pos_item_list] = 0
-        test_pos_item_binary[user_idx][test_pos_item_list] = 1
+    for idx, u in enumerate(user_ids):
+        train_pos_item_list = train_user_dict[u]
+        test_pos_item_list = test_user_dict[u]
+        cf_scores[idx][train_pos_item_list] = 0
+        test_pos_item_binary[idx][test_pos_item_list] = 1
     _, rank_indices = torch.sort(cf_scores, descending=True)
 
     binary_hit = []

@@ -39,10 +39,13 @@ def parse_nfm_args():
                         help='Number of epoch.')
     parser.add_argument('--stopping_steps', type=int, default=10,
                         help='Number of epoch for early stopping')
+
     parser.add_argument('--print_every', type=int, default=1,
                         help='Iter interval of printing loss.')
     parser.add_argument('--evaluate_every', type=int, default=1,
                         help='Epoch interval of evaluating CF.')
+    parser.add_argument('--n_evaluate_users', type=int, default=1000,
+                        help='Number of sampled users when evaluating CF.')
 
     parser.add_argument('--K', type=int, default=20,
                         help='Calculate metric@K when evaluating.')

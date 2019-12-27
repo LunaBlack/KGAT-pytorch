@@ -153,10 +153,7 @@ class KGAT(nn.Module):
         return loss
 
 
-    def cf_embedding(self, g, entity_ids):
-        """
-        entity_ids:  (cf_batch_size)
-        """
+    def cf_embedding(self, g):
         g = g.local_var()
         ego_embed = self.entity_user_embed(g.ndata['id'])
         all_embed = [ego_embed]
@@ -167,9 +164,8 @@ class KGAT(nn.Module):
             all_embed.append(norm_embed)
 
         # Equation (11)
-        all_embed = torch.cat(all_embed, dim=1)
-        entity_embed = all_embed[entity_ids]            # (cf_batch_size, cf_concat_dim)
-        return entity_embed
+        all_embed = torch.cat(all_embed, dim=1)         # (n_users + n_entities, cf_concat_dim)
+        return all_embed
 
 
     def cf_score(self, g, user_ids, item_ids):
@@ -177,8 +173,9 @@ class KGAT(nn.Module):
         user_ids:   number of users to evaluate   (n_eval_users)
         item_ids:   number of items to evaluate   (n_eval_items)
         """
-        user_embed = self.cf_embedding(g, user_ids)             # (n_eval_users, cf_concat_dim)
-        item_embed = self.cf_embedding(g, item_ids)             # (n_eval_items, cf_concat_dim)
+        all_embed = self.cf_embedding(g)                # (n_users + n_entities, cf_concat_dim)
+        user_embed = all_embed[user_ids]                # (n_eval_users, cf_concat_dim)
+        item_embed = all_embed[item_ids]                # (n_eval_items, cf_concat_dim)
 
         # Equation (12)
         cf_score = torch.matmul(user_embed, item_embed.transpose(0, 1))    # (n_eval_users, n_eval_items)
@@ -191,9 +188,10 @@ class KGAT(nn.Module):
         item_pos_ids:   (cf_batch_size)
         item_neg_ids:   (cf_batch_size)
         """
-        user_embed = self.cf_embedding(g, user_ids)                 # (cf_batch_size, cf_concat_dim)
-        item_pos_embed = self.cf_embedding(g, item_pos_ids)         # (cf_batch_size, cf_concat_dim)
-        item_neg_embed = self.cf_embedding(g, item_neg_ids)         # (cf_batch_size, cf_concat_dim)
+        all_embed = self.cf_embedding(g)                            # (n_users + n_entities, cf_concat_dim)
+        user_embed = all_embed[user_ids]                            # (cf_batch_size, cf_concat_dim)
+        item_pos_embed = all_embed[item_pos_ids]                    # (cf_batch_size, cf_concat_dim)
+        item_neg_embed = all_embed[item_neg_ids]                    # (cf_batch_size, cf_concat_dim)
 
         # Equation (12)
         pos_score = torch.sum(user_embed * item_pos_embed, dim=1)   # (cf_batch_size)

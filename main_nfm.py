@@ -18,7 +18,7 @@ from utility.helper import *
 from utility.loader_nfm import DataLoaderNFM
 
 
-def evaluate(model, dataloader, K, use_cuda, device):
+def evaluate(model, dataloader, user_ids, K, use_cuda, device):
     n_items = dataloader.n_items
     n_entities = dataloader.n_entities
     test_batch_size = dataloader.test_batch_size
@@ -27,7 +27,6 @@ def evaluate(model, dataloader, K, use_cuda, device):
 
     model.eval()
 
-    user_ids = list(test_user_dict.keys())
     item_ids = list(range(n_items))
     user_item_pairs = itertools.product(user_ids, item_ids)
 
@@ -50,9 +49,11 @@ def evaluate(model, dataloader, K, use_cuda, device):
 
             with torch.no_grad():
                 batch_scores = model.predict(feature_values)            # (batch_size)
-            cf_scores[[idx - n_entities for idx in batch_user], batch_item] = batch_scores
+            cf_scores[[user_ids.index(u) for u in batch_user], batch_item] = batch_scores
             pbar.update(1)
 
+    user_ids = torch.LongTensor(user_ids)
+    item_ids = torch.arange(n_items, dtype=torch.long)
     precision_k, recall_k, ndcg_k = calc_metrics_at_k(cf_scores, train_user_dict, test_user_dict, user_ids, item_ids, K, use_cuda)
     return cf_scores, precision_k, recall_k, ndcg_k
 
@@ -81,6 +82,12 @@ def train(args):
         item_pre_embed = torch.tensor(data.item_pre_embed)
     else:
         user_pre_embed, item_pre_embed = None, None
+
+    user_ids = list(data.test_user_dict.keys())
+    if args.n_evaluate_users:
+        sample_user_ids = random.sample(user_ids, args.n_evaluate_users)
+    else:
+        sample_user_ids = user_ids
 
     # construct model & optimizer
     model = NFM(args, data.n_users, data.n_items, data.n_entities, user_pre_embed, item_pre_embed)
@@ -133,7 +140,7 @@ def train(args):
         # evaluate cf
         if (epoch % args.evaluate_every) == 0:
             time1 = time()
-            _, precision, recall, ndcg = evaluate(model, data, args.K, use_cuda, device)
+            _, precision, recall, ndcg = evaluate(model, data, sample_user_ids, args.K, use_cuda, device)
             logging.info('CF Evaluation: Epoch {:04d} | Total Time {:.1f}s | Precision {:.4f} Recall {:.4f} NDCG {:.4f}'.format(epoch, time() - time1, precision, recall, ndcg))
 
             epoch_list.append(epoch)
@@ -154,7 +161,7 @@ def train(args):
     save_model(model, args.save_dir, epoch)
 
     # save metrics
-    _, precision, recall, ndcg = evaluate(model, data, args.K, use_cuda, device)
+    _, precision, recall, ndcg = evaluate(model, data, sample_user_ids, args.K, use_cuda, device)
     logging.info('Final CF Evaluation: Precision {:.4f} Recall {:.4f} NDCG {:.4f}'.format(precision, recall, ndcg))
 
     epoch_list.append(epoch)
@@ -178,6 +185,12 @@ def predict(args):
     # load data
     data = DataLoaderNFM(args, logging)
 
+    user_ids = list(data.test_user_dict.keys())
+    if args.n_evaluate_users:
+        sample_user_ids = random.sample(user_ids, args.n_evaluate_users)
+    else:
+        sample_user_ids = user_ids
+
     # load model
     model = NFM(args, data.n_users, data.n_items, data.n_entities)
     model = load_model(model, args.pretrain_model_path)
@@ -188,7 +201,7 @@ def predict(args):
         model = model.module
 
     # predict
-    cf_scores, precision, recall, ndcg = evaluate(model, data, args.K, use_cuda, device)
+    cf_scores, precision, recall, ndcg = evaluate(model, data, sample_user_ids, args.K, use_cuda, device)
     np.save(args.save_dir + 'cf_scores.npy', cf_scores.cpu().numpy())
     print('CF Evaluation: Precision {:.4f} Recall {:.4f} NDCG {:.4f}'.format(precision, recall, ndcg))
 
