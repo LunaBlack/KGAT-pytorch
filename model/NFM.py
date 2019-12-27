@@ -12,14 +12,12 @@ class HiddenLayer(nn.Module):
         self.dropout = dropout
 
         self.linear = nn.Linear(in_dim, out_dim)
-        self.batch_norm = nn.BatchNorm1d(out_dim)
         self.activation = nn.ReLU()
         self.message_dropout = nn.Dropout(dropout)
 
 
     def forward(self, x):
         out = self.linear(x)
-        out = self.batch_norm(out)
         out = self.activation(out)
         out = self.message_dropout(out)
         return out
@@ -57,7 +55,6 @@ class NFM(nn.Module):
             self.feature_embed = nn.Parameter(torch.Tensor(self.n_features, self.embed_dim))
             nn.init.xavier_uniform_(self.feature_embed, gain=nn.init.calculate_gain('relu'))
 
-        self.batch_norm = nn.BatchNorm1d(self.embed_dim)
         self.dropout = nn.Dropout(self.mess_dropout[0])
 
         if self.model_type == 'fm':
@@ -85,7 +82,7 @@ class NFM(nn.Module):
         bi = 0.5 * (sum_square_embed - square_sum_embed)                                        # (batch_size, embed_dim)
 
         # Hidden layers
-        z = self.dropout(self.batch_norm(bi))               # (batch_size, embed_dim)
+        z = self.dropout(bi)                                # (batch_size, embed_dim)
 
         if self.model_type == 'nfm':
             # Equation (5)
