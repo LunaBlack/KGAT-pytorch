@@ -175,6 +175,11 @@ def train(args):
 
 
 def predict(args):
+    # seed
+    random.seed(args.seed)
+    np.random.seed(args.seed)
+    torch.manual_seed(args.seed)
+
     # GPU / CPU
     use_cuda = torch.cuda.is_available()
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
