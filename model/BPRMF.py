@@ -27,12 +27,12 @@ class BPRMF(nn.Module):
         if (self.use_pretrain == 1) and (user_pre_embed is not None):
             self.user_embed.weight = nn.Parameter(user_pre_embed)
         else:
-            nn.init.xavier_uniform_(self.user_embed, gain=nn.init.calculate_gain('relu'))
+            nn.init.xavier_uniform_(self.user_embed.weight, gain=nn.init.calculate_gain('relu'))
 
         if (self.use_pretrain == 1) and (item_pre_embed is not None):
             self.item_embed.weight = nn.Parameter(item_pre_embed)
         else:
-            nn.init.xavier_uniform_(self.item_embed, gain=nn.init.calculate_gain('relu'))
+            nn.init.xavier_uniform_(self.item_embed.weight, gain=nn.init.calculate_gain('relu'))
 
 
     def predict(self, user_ids, item_ids):
