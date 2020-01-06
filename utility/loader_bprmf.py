@@ -126,8 +126,8 @@ class DataLoaderBPRMF(object):
 
         assert self.user_pre_embed.shape[0] == self.n_users
         assert self.item_pre_embed.shape[0] == self.n_items
-        assert self.user_pre_embed.shape[1] == self.args.entity_dim
-        assert self.item_pre_embed.shape[1] == self.args.entity_dim
+        assert self.user_pre_embed.shape[1] == self.args.embed_dim
+        assert self.item_pre_embed.shape[1] == self.args.embed_dim
 
 
 

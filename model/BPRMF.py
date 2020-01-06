@@ -14,7 +14,6 @@ class BPRMF(nn.Module):
                  user_pre_embed=None, item_pre_embed=None):
 
         super(BPRMF, self).__init__()
-        self.model_type = args.model_type
         self.use_pretrain = args.use_pretrain
 
         self.n_users = n_users
@@ -41,8 +40,8 @@ class BPRMF(nn.Module):
         user_ids:   number of users to evaluate   (n_eval_users)
         item_ids:   number of items to evaluate   (n_eval_items)
         """
-        user_embed = self.user_embed[user_ids]                              # (n_eval_users, embed_dim)
-        item_embed = self.item_embed[item_ids]                              # (n_eval_items, embed_dim)
+        user_embed = self.user_embed(user_ids)                              # (n_eval_users, embed_dim)
+        item_embed = self.item_embed(item_ids)                              # (n_eval_items, embed_dim)
         cf_score = torch.matmul(user_embed, item_embed.transpose(0, 1))     # (n_eval_users, n_eval_items)
         return cf_score
 
@@ -53,9 +52,9 @@ class BPRMF(nn.Module):
         item_pos_ids:   (batch_size)
         item_neg_ids:   (batch_size)
         """
-        user_embed = self.user_embed[user_ids]              # (batch_size, embed_dim)
-        item_pos_embed = self.item_embed[item_pos_ids]      # (batch_size, embed_dim)
-        item_neg_embed = self.item_embed[item_neg_ids]      # (batch_size, embed_dim)
+        user_embed = self.user_embed(user_ids)              # (batch_size, embed_dim)
+        item_pos_embed = self.item_embed(item_pos_ids)      # (batch_size, embed_dim)
+        item_neg_embed = self.item_embed(item_neg_ids)      # (batch_size, embed_dim)
 
         pos_score = torch.sum(user_embed * item_pos_embed, dim=1)       # (batch_size)
         neg_score = torch.sum(user_embed * item_neg_embed, dim=1)       # (batch_size)
