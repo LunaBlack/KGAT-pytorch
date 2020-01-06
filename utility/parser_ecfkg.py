@@ -1,8 +1,8 @@
 import argparse
 
 
-def parse_bprmf_args():
-    parser = argparse.ArgumentParser(description="Run BPRMF.")
+def parse_ecfkg_args():
+    parser = argparse.ArgumentParser(description="Run ECFKG.")
 
     parser.add_argument('--seed', type=int, default=123,
                         help='Random seed.')
@@ -20,12 +20,10 @@ def parse_bprmf_args():
                         help='Path of stored model.')
 
     parser.add_argument('--embed_dim', type=int, default=64,
-                        help='User / item Embedding size.')
-    parser.add_argument('--l2loss_lambda', type=float, default=1e-5,
-                        help='Lambda when calculating CF l2 loss.')
+                        help='User / entity / relation Embedding size.')
 
-    parser.add_argument('--train_batch_size', type=int, default=1024,
-                        help='Train batch size.')
+    parser.add_argument('--batch_size', type=int, default=1024,
+                        help='KG batch size.')
     parser.add_argument('--lr', type=float, default=0.0001,
                         help='Learning rate.')
     parser.add_argument('--n_epoch', type=int, default=1000,
@@ -43,7 +41,7 @@ def parse_bprmf_args():
 
     args = parser.parse_args()
 
-    save_dir = 'trained_model/BPRMF/{}/embeddim{}_lr{}_pretrain{}/'.format(
+    save_dir = 'trained_model/ECFKG/{}/embeddim{}_lr{}_pretrain{}/'.format(
         args.data_name, args.embed_dim, args.lr, args.use_pretrain)
     args.save_dir = save_dir
 
