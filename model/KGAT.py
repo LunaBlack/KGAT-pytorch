@@ -122,7 +122,7 @@ class KGAT(nn.Module):
         return g.edata.pop('att')
 
 
-    def kg_embedding(self, h, r, pos_t, neg_t):
+    def calc_kg_loss(self, h, r, pos_t, neg_t):
         """
         h:      (kg_batch_size)
         r:      (kg_batch_size)
@@ -182,7 +182,7 @@ class KGAT(nn.Module):
         return cf_score
 
 
-    def cf_loss(self, g, user_ids, item_pos_ids, item_neg_ids):
+    def calc_cf_loss(self, g, user_ids, item_pos_ids, item_neg_ids):
         """
         user_ids:       (cf_batch_size)
         item_pos_ids:   (cf_batch_size)
