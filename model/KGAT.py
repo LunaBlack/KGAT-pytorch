@@ -141,8 +141,8 @@ class KGAT(nn.Module):
         r_mul_neg_t = torch.bmm(neg_t_embed.unsqueeze(1), W_r).squeeze(1)     # (kg_batch_size, relation_dim)
 
         # Equation (1)
-        pos_score = torch.sum(torch.pow(r_mul_h + r_embed - r_mul_pos_t, 2), dim=1, keepdim=True)     # (kg_batch_size, 1)
-        neg_score = torch.sum(torch.pow(r_mul_h + r_embed - r_mul_neg_t, 2), dim=1, keepdim=True)     # (kg_batch_size, 1)
+        pos_score = torch.sum(torch.pow(r_mul_h + r_embed - r_mul_pos_t, 2), dim=1)     # (kg_batch_size)
+        neg_score = torch.sum(torch.pow(r_mul_h + r_embed - r_mul_neg_t, 2), dim=1)     # (kg_batch_size)
 
         # Equation (2)
         kg_loss = (-1.0) * F.logsigmoid(neg_score - pos_score)

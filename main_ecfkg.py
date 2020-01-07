@@ -16,14 +16,8 @@ from utility.helper import *
 from utility.loader_ecfkg import DataLoaderECFKG
 
 
-def evaluate(model, relation_u2i_id, train_user_dict, test_user_dict, item_ids, K, use_cuda, device):
+def evaluate(model, user_ids, item_ids, relation_u2i_id, train_user_dict, test_user_dict, K, use_cuda):
     model.eval()
-
-    user_ids = test_user_dict.keys()
-    user_ids = torch.LongTensor(list(user_ids))
-    if use_cuda:
-        user_ids = user_ids.to(device)
-
     with torch.no_grad():
         cf_scores = model.predict(user_ids, item_ids, relation_u2i_id)       # (n_eval_users, n_eval_items)
     precision_k, recall_k, ndcg_k = calc_metrics_at_k(cf_scores, train_user_dict, test_user_dict, user_ids, item_ids, K, use_cuda)
@@ -55,6 +49,11 @@ def train(args):
         item_pre_embed = torch.tensor(data.item_pre_embed)
     else:
         user_pre_embed, item_pre_embed = None, None
+
+    user_ids = data.test_user_dict.keys()
+    user_ids = torch.LongTensor(list(user_ids))
+    if use_cuda:
+        user_ids = user_ids.to(device)
 
     item_ids = torch.arange(data.n_items, dtype=torch.long)
     if use_cuda:
@@ -117,7 +116,7 @@ def train(args):
         # evaluate cf
         if (epoch % args.evaluate_every) == 0:
             time1 = time()
-            _, precision, recall, ndcg = evaluate(model, relation_u2i_id, data.train_user_dict, data.test_user_dict, item_ids, args.K, use_cuda, device)
+            _, precision, recall, ndcg = evaluate(model, user_ids, item_ids, relation_u2i_id, data.train_user_dict, data.test_user_dict, args.K, use_cuda)
             logging.info('CF Evaluation: Epoch {:04d} | Total Time {:.1f}s | Precision {:.4f} Recall {:.4f} NDCG {:.4f}'.format(epoch, time() - time1, precision, recall, ndcg))
 
             epoch_list.append(epoch)
@@ -138,7 +137,7 @@ def train(args):
     save_model(model, args.save_dir, epoch)
 
     # save metrics
-    _, precision, recall, ndcg = evaluate(model, data.relation_u2i_id, data.train_user_dict, data.test_user_dict, item_ids, args.K, use_cuda, device)
+    _, precision, recall, ndcg = evaluate(model, user_ids, item_ids, relation_u2i_id, data.train_user_dict, data.test_user_dict, args.K, use_cuda)
     logging.info('Final CF Evaluation: Precision {:.4f} Recall {:.4f} NDCG {:.4f}'.format(precision, recall, ndcg))
 
     epoch_list.append(epoch)
@@ -162,6 +161,11 @@ def predict(args):
     # load data
     data = DataLoaderECFKG(args, logging)
 
+    user_ids = data.test_user_dict.keys()
+    user_ids = torch.LongTensor(list(user_ids))
+    if use_cuda:
+        user_ids = user_ids.to(device)
+
     item_ids = torch.arange(data.n_items, dtype=torch.long)
     if use_cuda:
         item_ids = item_ids.to(device)
@@ -180,7 +184,7 @@ def predict(args):
         model = model.module
 
     # predict
-    cf_scores, precision, recall, ndcg = evaluate(model, relation_u2i_id, data.train_user_dict, data.test_user_dict, item_ids, args.K, use_cuda, device)
+    cf_scores, precision, recall, ndcg = evaluate(model, user_ids, item_ids, relation_u2i_id, data.train_user_dict, data.test_user_dict, args.K, use_cuda)
     np.save(args.save_dir + 'cf_scores.npy', cf_scores.cpu().numpy())
     print('CF Evaluation: Precision {:.4f} Recall {:.4f} NDCG {:.4f}'.format(precision, recall, ndcg))
 

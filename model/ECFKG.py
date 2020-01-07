@@ -37,7 +37,7 @@ class ECFKG(nn.Module):
         item_embed = self.entity_user_embed(item_ids)       # (n_eval_items, embed_dim)
 
         cf_score = torch.matmul((user_embed + r_embed), item_embed.transpose(0, 1))     # (n_eval_users, n_eval_items)
-        cf_score = F.softmax(cf_score, dim=1)                                           # (n_eval_users, n_eval_items)
+        # cf_score = F.softmax(cf_score, dim=1)
         return cf_score
 
 
@@ -53,13 +53,11 @@ class ECFKG(nn.Module):
         pos_t_embed = self.entity_user_embed(pos_t)      # (batch_size, embed_dim)
         neg_t_embed = self.entity_user_embed(neg_t)      # (batch_size, embed_dim)
 
-        # Equation (1) + (5)
-        pos_score = F.logsigmoid(torch.sum((h_embed + r_embed) * pos_t_embed, dim=1, keepdim=True))      # (batch_size, 1)
-        neg_score = F.logsigmoid(torch.sum((h_embed + r_embed) * neg_t_embed, dim=1, keepdim=True))      # (batch_size, 1)
+        pos_score = torch.sum((h_embed + r_embed) * pos_t_embed, dim=1)      # (batch_size)
+        neg_score = torch.sum((h_embed + r_embed) * neg_t_embed, dim=1)      # (batch_size)
 
-        kg_loss = neg_score - pos_score
-        kg_loss = torch.mean(kg_loss)
+        loss_func = nn.BCEWithLogitsLoss()
+        kg_loss = loss_func(pos_score, torch.ones_like(pos_score)) + loss_func(neg_score, torch.zeros_like(neg_score))
         return kg_loss
-
 
 
