@@ -114,7 +114,7 @@ def train(args):
             optimizer.zero_grad()
             total_loss += batch_loss.item()
 
-            if (iter % args.cf_print_every) == 0:
+            if (iter % args.print_every) == 0:
                 logging.info('KG & CF Training: Epoch {:04d} Iter {:04d} / {:04d} | Time {:.1f}s | Iter Loss {:.4f} | Iter Mean Loss {:.4f}'.format(epoch, iter, n_batch, time() - time2, batch_loss.item(), total_loss / iter))
         logging.info('KG & CF Training: Epoch {:04d} Total Iter {:04d} | Total Time {:.1f}s | Iter Mean Loss {:.4f}'.format(epoch, n_batch, time() - time1, total_loss / n_batch))
 
@@ -195,7 +195,6 @@ if __name__ == '__main__':
     args = parse_cke_args()
     train(args)
     # predict(args)
-
 
 
 

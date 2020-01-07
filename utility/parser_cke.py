@@ -26,7 +26,7 @@ def parse_cke_args():
 
     parser.add_argument('--entity_dim', type=int, default=64,
                         help='User / item / entity Embedding size.')
-    parser.add_argument('--relation_dim', type=int, default=64,
+    parser.add_argument('--relation_dim', type=int, default=50,
                         help='Relation Embedding size.')
 
     parser.add_argument('--kg_l2loss_lambda', type=float, default=1e-5,

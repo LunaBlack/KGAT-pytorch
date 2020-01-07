@@ -80,8 +80,8 @@ class DataLoaderCKE(object):
         reverse_kg_data['r'] += n_relations
         self.kg_data = pd.concat([kg_data, reverse_kg_data], axis=0, ignore_index=True, sort=False)
 
-        self.n_relations = max(kg_data['r']) + 1
-        self.n_entities = max(max(kg_data['h']), max(kg_data['t'])) + 1
+        self.n_relations = max(self.kg_data['r']) + 1
+        self.n_entities = max(max(self.kg_data['h']), max(kg_data['t'])) + 1
         self.n_kg_data = len(self.kg_data)
 
         # construct kg dict

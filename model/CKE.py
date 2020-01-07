@@ -57,7 +57,7 @@ class CKE(nn.Module):
         neg_t:  (kg_batch_size)
         """
         r_embed = self.relation_embed(r)                 # (kg_batch_size, relation_dim)
-        W_r = self.W_R[r]                                # (kg_batch_size, entity_dim, relation_dim)
+        W_r = self.trans_M[r]                            # (kg_batch_size, entity_dim, relation_dim)
 
         h_embed = self.entity_embed(h)                   # (kg_batch_size, entity_dim)
         pos_t_embed = self.entity_embed(pos_t)           # (kg_batch_size, entity_dim)
@@ -110,7 +110,7 @@ class CKE(nn.Module):
         cf_loss = torch.mean(cf_loss)
 
         l2_loss = _L2_loss_mean(user_embed) + _L2_loss_mean(item_pos_cf_embed) + _L2_loss_mean(item_neg_cf_embed)
-        loss = cf_loss + self.l2loss_lambda * l2_loss
+        loss = cf_loss + self.cf_l2loss_lambda * l2_loss
         return loss
 
 
