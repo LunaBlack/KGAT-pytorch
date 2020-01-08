@@ -24,7 +24,7 @@ def precision_at_k_batch(hits, k):
     calculate Precision@k
     hits: array, element is binary (0 / 1), 2-dim
     """
-    res = hits[:, :k].mean(axis=1).mean()
+    res = hits[:, :k].mean(axis=1)
     return res
 
 
@@ -73,7 +73,7 @@ def ndcg_at_k_batch(hits, k):
     idcg = np.sum((2 ** sorted_hits_k - 1) / np.log2(np.arange(2, k + 2)), axis=1)
     idcg[idcg == 0] = np.inf
 
-    res = (dcg / idcg).mean()
+    res = (dcg / idcg)
     return res
 
 
@@ -91,7 +91,7 @@ def recall_at_k_batch(hits, k):
     calculate Recall@k
     hits: array, element is binary (0 / 1), 2-dim
     """
-    res = (hits[:, :k].sum(axis=1) / hits.sum(axis=1)).mean()
+    res = (hits[:, :k].sum(axis=1) / hits.sum(axis=1))
     return res
 
 
@@ -115,26 +115,19 @@ def logloss(ground_truth, prediction):
     return logloss
 
 
-def calc_metrics_at_k(cf_scores, train_user_dict, test_user_dict, user_ids, item_ids, K, use_cuda):
+def calc_metrics_at_k(cf_scores, train_user_dict, test_user_dict, user_ids, item_ids, K):
     """
     cf_scores: (n_eval_users, n_eval_items)
     """
-    if use_cuda:
-        user_ids = user_ids.cpu().numpy()
-        item_ids = item_ids.cpu().numpy()
-        cf_scores = cf_scores.cpu()
-    else:
-        user_ids = user_ids.numpy()
-        item_ids = item_ids.numpy()
-        cf_scores = cf_scores
-
     test_pos_item_binary = np.zeros([len(user_ids), len(item_ids)], dtype=np.float32)
     for idx, u in enumerate(user_ids):
         train_pos_item_list = train_user_dict[u]
         test_pos_item_list = test_user_dict[u]
         cf_scores[idx][train_pos_item_list] = 0
         test_pos_item_binary[idx][test_pos_item_list] = 1
-    _, rank_indices = torch.sort(cf_scores, descending=True)
+
+    _, rank_indices = torch.sort(cf_scores.cuda(), descending=True)
+    rank_indices = rank_indices.cpu()
 
     binary_hit = []
     for i in range(len(user_ids)):
@@ -145,10 +138,5 @@ def calc_metrics_at_k(cf_scores, train_user_dict, test_user_dict, user_ids, item
     recall = recall_at_k_batch(binary_hit, K)
     ndcg = ndcg_at_k_batch(binary_hit, K)
     return precision, recall, ndcg
-
-
-
-
-
 
 

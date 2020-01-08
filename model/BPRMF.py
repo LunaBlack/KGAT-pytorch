@@ -66,3 +66,10 @@ class BPRMF(nn.Module):
         loss = cf_loss + self.l2loss_lambda * l2_loss
         return loss
 
+
+    def forward(self, mode, *input):
+        if mode == 'train':
+            return self.calc_loss(*input)
+
+
+

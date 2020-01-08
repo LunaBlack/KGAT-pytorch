@@ -1,4 +1,6 @@
 import os
+from collections import OrderedDict
+
 import dgl
 import torch
 from dgl import function as fn
@@ -45,9 +47,19 @@ def save_model(model, model_dir, current_epoch, last_best_epoch=None):
 
 def load_model(model, model_path):
     checkpoint = torch.load(model_path, map_location=torch.device('cpu'))
-    model.load_state_dict(checkpoint['model_state_dict'])
+
+    try:
+        model.load_state_dict(checkpoint['model_state_dict'])
+    except RuntimeError:
+        state_dict = OrderedDict()
+        for k, v in checkpoint['model_state_dict'].items():
+            k_ = k[7:]              # remove 'module.' of DistributedDataParallel instance
+            state_dict[k_] = v
+        model.load_state_dict(state_dict)
+
     model.eval()
     return model
+
 
 
 
