@@ -1,3 +1,4 @@
+import os
 import random
 import logging
 import argparse
@@ -7,8 +8,9 @@ from time import time
 import torch
 import numpy as np
 import pandas as pd
-import torch.optim as optim
 from tqdm import tqdm, trange
+import torch.nn as nn
+import torch.optim as optim
 
 from model.NFM import NFM
 from utility.parser_nfm import *
@@ -19,6 +21,7 @@ from utility.loader_nfm import DataLoaderNFM
 
 
 def evaluate(model, dataloader, user_ids, K, use_cuda, device):
+    n_users = len(user_ids)             # user number in test data
     n_items = dataloader.n_items
     n_entities = dataloader.n_entities
     test_batch_size = dataloader.test_batch_size
@@ -34,7 +37,7 @@ def evaluate(model, dataloader, user_ids, K, use_cuda, device):
     if use_cuda:
         cf_scores = cf_scores.to(device)
 
-    n_test_batch = len(user_ids) * len(item_ids) // test_batch_size + 1
+    n_test_batch = n_users * n_items // test_batch_size + 1
     with tqdm(total=n_test_batch, desc='Evaluating Iteration') as pbar:
         while True:
             batch_pairs = list(itertools.islice(user_item_pairs, test_batch_size))
@@ -52,9 +55,15 @@ def evaluate(model, dataloader, user_ids, K, use_cuda, device):
             cf_scores[[user_ids.index(u) for u in batch_user], batch_item] = batch_scores
             pbar.update(1)
 
-    user_ids = torch.LongTensor(user_ids)
-    item_ids = torch.arange(n_items, dtype=torch.long)
-    precision_k, recall_k, ndcg_k = calc_metrics_at_k(cf_scores, train_user_dict, test_user_dict, user_ids, item_ids, K, use_cuda)
+    cf_scores = cf_scores.cpu()
+    user_ids = np.array(user_ids)
+    item_ids = np.array(item_ids)
+    precision_k, recall_k, ndcg_k = calc_metrics_at_k(cf_scores, train_user_dict, test_user_dict, user_ids, item_ids, K)
+
+    cf_scores = cf_scores.numpy()
+    precision_k = precision_k.mean()
+    recall_k = recall_k.mean()
+    ndcg_k = ndcg_k.mean()
     return cf_scores, precision_k, recall_k, ndcg_k
 
 
@@ -95,10 +104,6 @@ def train(args):
         model = load_model(model, args.pretrain_model_path)
 
     model.to(device)
-    if n_gpu > 1:
-        model = torch.nn.DataParallel(model)
-    if isinstance(model, torch.nn.DataParallel):
-        model = model.module
     logging.info(model)
 
     optimizer = optim.Adam(model.parameters(), lr=args.lr)
@@ -200,14 +205,10 @@ def predict(args):
     model = NFM(args, data.n_users, data.n_items, data.n_entities)
     model = load_model(model, args.pretrain_model_path)
     model.to(device)
-    if n_gpu > 1:
-        model = torch.nn.DataParallel(model)
-    if isinstance(model, torch.nn.DataParallel):
-        model = model.module
 
     # predict
     cf_scores, precision, recall, ndcg = evaluate(model, data, sample_user_ids, args.K, use_cuda, device)
-    np.save(args.save_dir + 'cf_scores.npy', cf_scores.cpu().numpy())
+    np.save(args.save_dir + 'cf_scores.npy', cf_scores)
     print('CF Evaluation: Precision {:.4f} Recall {:.4f} NDCG {:.4f}'.format(precision, recall, ndcg))
 
 

@@ -24,7 +24,7 @@ def parse_nfm_args():
 
     parser.add_argument('--embed_dim', type=int, default=64,
                         help='User / entity Embedding size.')
-    parser.add_argument('--hidden_dim_list', nargs='?', default='[32]',
+    parser.add_argument('--hidden_dim_list', nargs='?', default='[64]',
                         help='Output sizes of every hidden layer.')
     parser.add_argument('--mess_dropout', nargs='?', default='[0.1, 0.1]',
                         help='Dropout probability w.r.t. message dropout for bi-interaction layer and each hidden layer. 0: no dropout.')
@@ -33,7 +33,8 @@ def parse_nfm_args():
                         help='Train batch size.')
     parser.add_argument('--test_batch_size', type=int, default=1048576,
                         help='Test batch size.')
-    parser.add_argument('--lr', type=float, default=0.0001,
+
+    parser.add_argument('--lr', type=float, default=0.005,
                         help='Learning rate.')
     parser.add_argument('--n_epoch', type=int, default=1000,
                         help='Number of epoch.')
