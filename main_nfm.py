@@ -93,7 +93,7 @@ def train(args):
         user_pre_embed, item_pre_embed = None, None
 
     user_ids = list(data.test_user_dict.keys())
-    if args.n_evaluate_users:
+    if args.n_evaluate_users and 0 < args.n_evaluate_users < len(user_ids):
         sample_user_ids = random.sample(user_ids, args.n_evaluate_users)
     else:
         sample_user_ids = user_ids
@@ -196,7 +196,7 @@ def predict(args):
     data = DataLoaderNFM(args, logging)
 
     user_ids = list(data.test_user_dict.keys())
-    if args.n_evaluate_users:
+    if args.n_evaluate_users and 0 < args.n_evaluate_users < len(user_ids):
         sample_user_ids = random.sample(user_ids, args.n_evaluate_users)
     else:
         sample_user_ids = user_ids
