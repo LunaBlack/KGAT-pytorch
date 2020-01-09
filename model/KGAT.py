@@ -34,12 +34,19 @@ class Aggregator(nn.Module):
         self.activation = nn.LeakyReLU()
 
 
-    def forward(self, g, entity_embed):
+    def forward(self, mode, g, entity_embed):
         g = g.local_var()
         g.ndata['node'] = entity_embed
+
         # Equation (3) & (10)
-        g.update_all(dgl.function.u_mul_e('node', 'att', 'side'), lambda nodes: {'N_h': torch.sum(nodes.mailbox['side'], 1)})
-        # g.update_all(dgl.function.u_mul_e('node', 'att', 'side'), dgl.function.sum('side', 'N_h'))
+        # DGL: dgl-cu90(0.4.1)
+        # Get different results when using `dgl.function.sum`, and the randomness is due to `atomicAdd`
+        # Use `dgl.function.sum` when training model to speed up
+        # Use custom function to ensure deterministic behavior when predicting
+        if mode == 'predict':
+            g.update_all(dgl.function.u_mul_e('node', 'att', 'side'), lambda nodes: {'N_h': torch.sum(nodes.mailbox['side'], 1)})
+        else:
+            g.update_all(dgl.function.u_mul_e('node', 'att', 'side'), dgl.function.sum('side', 'N_h'))
 
         if self.aggregator_type == 'gcn':
             # Equation (6) & (9)
@@ -153,13 +160,13 @@ class KGAT(nn.Module):
         return loss
 
 
-    def cf_embedding(self, g):
+    def cf_embedding(self, mode, g):
         g = g.local_var()
         ego_embed = self.entity_user_embed(g.ndata['id'])
         all_embed = [ego_embed]
 
         for i, layer in enumerate(self.aggregator_layers):
-            ego_embed = layer(g, ego_embed)
+            ego_embed = layer(mode, g, ego_embed)
             norm_embed = F.normalize(ego_embed, p=2, dim=1)
             all_embed.append(norm_embed)
 
@@ -168,12 +175,12 @@ class KGAT(nn.Module):
         return all_embed
 
 
-    def cf_score(self, g, user_ids, item_ids):
+    def cf_score(self, mode, g, user_ids, item_ids):
         """
         user_ids:   number of users to evaluate   (n_eval_users)
         item_ids:   number of items to evaluate   (n_eval_items)
         """
-        all_embed = self.cf_embedding(g)                # (n_users + n_entities, cf_concat_dim)
+        all_embed = self.cf_embedding(mode, g)          # (n_users + n_entities, cf_concat_dim)
         user_embed = all_embed[user_ids]                # (n_eval_users, cf_concat_dim)
         item_embed = all_embed[item_ids]                # (n_eval_items, cf_concat_dim)
 
@@ -182,13 +189,13 @@ class KGAT(nn.Module):
         return cf_score
 
 
-    def calc_cf_loss(self, g, user_ids, item_pos_ids, item_neg_ids):
+    def calc_cf_loss(self, mode, g, user_ids, item_pos_ids, item_neg_ids):
         """
         user_ids:       (cf_batch_size)
         item_pos_ids:   (cf_batch_size)
         item_neg_ids:   (cf_batch_size)
         """
-        all_embed = self.cf_embedding(g)                            # (n_users + n_entities, cf_concat_dim)
+        all_embed = self.cf_embedding(mode, g)                      # (n_users + n_entities, cf_concat_dim)
         user_embed = all_embed[user_ids]                            # (cf_batch_size, cf_concat_dim)
         item_pos_embed = all_embed[item_pos_ids]                    # (cf_batch_size, cf_concat_dim)
         item_neg_embed = all_embed[item_neg_ids]                    # (cf_batch_size, cf_concat_dim)
@@ -205,5 +212,15 @@ class KGAT(nn.Module):
         loss = cf_loss + self.cf_l2loss_lambda * l2_loss
         return loss
 
+
+    def forward(self, mode, *input):
+        if mode == 'calc_att':
+            return self.compute_attention(*input)
+        if mode == 'calc_cf_loss':
+            return self.calc_cf_loss(mode, *input)
+        if mode == 'calc_kg_loss':
+            return self.calc_kg_loss(*input)
+        if mode == 'predict':
+            return self.cf_score(mode, *input)
 
 

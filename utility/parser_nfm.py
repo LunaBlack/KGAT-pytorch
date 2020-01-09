@@ -34,7 +34,7 @@ def parse_nfm_args():
     parser.add_argument('--test_batch_size', type=int, default=1048576,
                         help='Test batch size.')
 
-    parser.add_argument('--lr', type=float, default=0.005,
+    parser.add_argument('--lr', type=float, default=0.0001,
                         help='Learning rate.')
     parser.add_argument('--n_epoch', type=int, default=1000,
                         help='Number of epoch.')

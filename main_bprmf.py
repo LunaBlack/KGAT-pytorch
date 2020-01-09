@@ -34,9 +34,9 @@ def evaluate(model, train_user_dict, test_user_dict, user_ids_batches, item_ids,
     recall = []
     ndcg = []
 
-    for user_ids_batch in user_ids_batches:
-        with torch.no_grad():
-            cf_scores_batch = model.predict(user_ids_batch, item_ids)
+    with torch.no_grad():
+        for user_ids_batch in user_ids_batches:
+            cf_scores_batch = model.predict(user_ids_batch, item_ids)       # (n_batch_users, n_eval_items)
 
             cf_scores_batch = cf_scores_batch.cpu()
             user_ids_batch = user_ids_batch.cpu().numpy()

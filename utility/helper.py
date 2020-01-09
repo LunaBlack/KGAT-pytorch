@@ -1,14 +1,14 @@
 import os
 from collections import OrderedDict
 
-import dgl
 import torch
 from dgl import function as fn
 
 
+# DGL: dgl-cu90(0.4.1)
+# We will get different results when using the function `fn.sum`, and the randomness is due to `atomicAdd`.
+# Use custom function to ensure deterministic behavior.
 def edge_softmax_fix(graph, score):
-    # to solve the issue on `fn.sum`
-    # it seems to get different results with `fn.sum` every time
 
     def reduce_sum(nodes):
         accum = torch.sum(nodes.mailbox['temp'], 1)

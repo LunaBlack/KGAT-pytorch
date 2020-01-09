@@ -4,6 +4,9 @@ import argparse
 def parse_kgat_args():
     parser = argparse.ArgumentParser(description="Run KGAT.")
 
+    parser.add_argument('--local_rank', type=int, default=0,
+                        help='Local rank for using multi GPUs.')
+
     parser.add_argument('--seed', type=int, default=123,
                         help='Random seed.')
 
@@ -23,6 +26,8 @@ def parse_kgat_args():
                         help='CF batch size.')
     parser.add_argument('--kg_batch_size', type=int, default=2048,
                         help='KG batch size.')
+    parser.add_argument('--test_batch_size', type=int, default=10000,
+                        help='Test batch size (the user number to test every batch).')
 
     parser.add_argument('--entity_dim', type=int, default=64,
                         help='User / entity Embedding size.')
@@ -47,6 +52,7 @@ def parse_kgat_args():
                         help='Number of epoch.')
     parser.add_argument('--stopping_steps', type=int, default=10,
                         help='Number of epoch for early stopping')
+
     parser.add_argument('--cf_print_every', type=int, default=1,
                         help='Iter interval of printing CF loss.')
     parser.add_argument('--kg_print_every', type=int, default=1,
