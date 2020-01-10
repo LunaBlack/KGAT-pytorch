@@ -4,6 +4,9 @@ import argparse
 def parse_cke_args():
     parser = argparse.ArgumentParser(description="Run CKE.")
 
+    parser.add_argument('--local_rank', type=int, default=0,
+                        help='Local rank for using multi GPUs.')
+
     parser.add_argument('--seed', type=int, default=123,
                         help='Random seed.')
 
@@ -23,10 +26,12 @@ def parse_cke_args():
                         help='CF batch size.')
     parser.add_argument('--kg_batch_size', type=int, default=2048,
                         help='KG batch size.')
+    parser.add_argument('--test_batch_size', type=int, default=10000,
+                        help='Test batch size (the user number to test every batch).')
 
-    parser.add_argument('--entity_dim', type=int, default=64,
+    parser.add_argument('--embed_dim', type=int, default=64,
                         help='User / item / entity Embedding size.')
-    parser.add_argument('--relation_dim', type=int, default=50,
+    parser.add_argument('--relation_dim', type=int, default=64,
                         help='Relation Embedding size.')
 
     parser.add_argument('--kg_l2loss_lambda', type=float, default=1e-5,
@@ -51,8 +56,8 @@ def parse_cke_args():
 
     args = parser.parse_args()
 
-    save_dir = 'trained_model/CKE/{}/entitydim{}_relationdim{}_lr{}_pretrain{}/'.format(
-        args.data_name, args.entity_dim, args.relation_dim, args.lr, args.use_pretrain)
+    save_dir = 'trained_model/CKE/{}/embeddim{}_relationdim{}_lr{}_pretrain{}/'.format(
+        args.data_name, args.embed_dim, args.relation_dim, args.lr, args.use_pretrain)
     args.save_dir = save_dir
 
     return args

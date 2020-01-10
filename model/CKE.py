@@ -21,18 +21,18 @@ class CKE(nn.Module):
         self.n_entities = n_entities
         self.n_relations = n_relations
 
-        self.entity_dim = args.entity_dim
+        self.embed_dim = args.embed_dim
         self.relation_dim = args.relation_dim
 
         self.cf_l2loss_lambda = args.cf_l2loss_lambda
         self.kg_l2loss_lambda = args.kg_l2loss_lambda
 
-        self.user_embed = nn.Embedding(self.n_users, self.entity_dim)
-        self.item_embed = nn.Embedding(self.n_items, self.entity_dim)
+        self.user_embed = nn.Embedding(self.n_users, self.embed_dim)
+        self.item_embed = nn.Embedding(self.n_items, self.embed_dim)
 
-        self.entity_embed = nn.Embedding(self.n_entities, self.entity_dim)
+        self.entity_embed = nn.Embedding(self.n_entities, self.embed_dim)
         self.relation_embed = nn.Embedding(self.n_relations, self.relation_dim)
-        self.trans_M = nn.Parameter(torch.Tensor(self.n_relations, self.entity_dim, self.relation_dim))
+        self.trans_M = nn.Parameter(torch.Tensor(self.n_relations, self.embed_dim, self.relation_dim))
 
         if (self.use_pretrain == 1) and (user_pre_embed is not None):
             self.user_embed.weight = nn.Parameter(user_pre_embed)
@@ -57,11 +57,11 @@ class CKE(nn.Module):
         neg_t:  (kg_batch_size)
         """
         r_embed = self.relation_embed(r)                 # (kg_batch_size, relation_dim)
-        W_r = self.trans_M[r]                            # (kg_batch_size, entity_dim, relation_dim)
+        W_r = self.trans_M[r]                            # (kg_batch_size, embed_dim, relation_dim)
 
-        h_embed = self.entity_embed(h)                   # (kg_batch_size, entity_dim)
-        pos_t_embed = self.entity_embed(pos_t)           # (kg_batch_size, entity_dim)
-        neg_t_embed = self.entity_embed(neg_t)           # (kg_batch_size, entity_dim)
+        h_embed = self.entity_embed(h)                   # (kg_batch_size, embed_dim)
+        pos_t_embed = self.entity_embed(pos_t)           # (kg_batch_size, embed_dim)
+        neg_t_embed = self.entity_embed(neg_t)           # (kg_batch_size, embed_dim)
 
         # Equation (2)
         r_mul_h = torch.bmm(h_embed.unsqueeze(1), W_r).squeeze(1)             # (kg_batch_size, relation_dim)
@@ -91,16 +91,16 @@ class CKE(nn.Module):
         item_pos_ids:   (cf_batch_size)
         item_neg_ids:   (cf_batch_size)
         """
-        user_embed = self.user_embed(user_ids)                          # (cf_batch_size, entity_dim)
-        item_pos_embed = self.item_embed(item_pos_ids)                  # (cf_batch_size, entity_dim)
-        item_neg_embed = self.item_embed(item_neg_ids)                  # (cf_batch_size, entity_dim)
+        user_embed = self.user_embed(user_ids)                          # (cf_batch_size, embed_dim)
+        item_pos_embed = self.item_embed(item_pos_ids)                  # (cf_batch_size, embed_dim)
+        item_neg_embed = self.item_embed(item_neg_ids)                  # (cf_batch_size, embed_dim)
 
-        item_pos_kg_embed = self.entity_embed(item_pos_ids)             # (cf_batch_size, entity_dim)
-        item_neg_kg_embed = self.entity_embed(item_neg_ids)             # (cf_batch_size, entity_dim)
+        item_pos_kg_embed = self.entity_embed(item_pos_ids)             # (cf_batch_size, embed_dim)
+        item_neg_kg_embed = self.entity_embed(item_neg_ids)             # (cf_batch_size, embed_dim)
 
         # Equation (5)
-        item_pos_cf_embed = item_pos_embed + item_pos_kg_embed          # (cf_batch_size, entity_dim)
-        item_neg_cf_embed = item_neg_embed + item_neg_kg_embed          # (cf_batch_size, entity_dim)
+        item_pos_cf_embed = item_pos_embed + item_pos_kg_embed          # (cf_batch_size, embed_dim)
+        item_neg_cf_embed = item_neg_embed + item_neg_kg_embed          # (cf_batch_size, embed_dim)
 
         # Equation (6)
         pos_score = torch.sum(user_embed * item_pos_cf_embed, dim=1)    # (cf_batch_size)
@@ -136,13 +136,19 @@ class CKE(nn.Module):
         user_ids:   number of users to evaluate   (n_eval_users)
         item_ids:   number of items to evaluate   (n_eval_items)
         """
-        user_embed = self.user_embed(user_ids)                  # (n_eval_users, entity_dim)
-        item_embed = self.item_embed(item_ids)                  # (n_eval_items, entity_dim)
+        user_embed = self.user_embed(user_ids)                  # (n_eval_users, embed_dim)
+        item_embed = self.item_embed(item_ids)                  # (n_eval_items, embed_dim)
 
-        item_kg_embed = self.entity_embed(item_ids)             # (n_eval_items, entity_dim)
-        item_cf_embed = item_embed + item_kg_embed              # (n_eval_items, entity_dim)
+        item_kg_embed = self.entity_embed(item_ids)             # (n_eval_items, embed_dim)
+        item_cf_embed = item_embed + item_kg_embed              # (n_eval_items, embed_dim)
 
         cf_score = torch.matmul(user_embed, item_cf_embed.transpose(0, 1))      # (n_eval_users, n_eval_items)
         return cf_score
+
+
+    def forward(self, mode, *input):
+        if mode == 'train':
+            return self.calc_loss(*input)
+
 
 
