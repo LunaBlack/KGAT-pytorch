@@ -61,3 +61,8 @@ class ECFKG(nn.Module):
         return kg_loss
 
 
+    def forward(self, mode, *input):
+        if mode == 'train':
+            return self.calc_loss(*input)
+
+

@@ -4,6 +4,9 @@ import argparse
 def parse_ecfkg_args():
     parser = argparse.ArgumentParser(description="Run ECFKG.")
 
+    parser.add_argument('--local_rank', type=int, default=0,
+                        help='Local rank for using multi GPUs.')
+
     parser.add_argument('--seed', type=int, default=123,
                         help='Random seed.')
 
@@ -22,8 +25,11 @@ def parse_ecfkg_args():
     parser.add_argument('--embed_dim', type=int, default=64,
                         help='User / entity / relation Embedding size.')
 
-    parser.add_argument('--batch_size', type=int, default=2048,
+    parser.add_argument('--train_batch_size', type=int, default=2048,
                         help='KG batch size.')
+    parser.add_argument('--test_batch_size', type=int, default=10000,
+                        help='Test batch size (the user number to test every batch).')
+
     parser.add_argument('--lr', type=float, default=0.0001,
                         help='Learning rate.')
     parser.add_argument('--n_epoch', type=int, default=1000,

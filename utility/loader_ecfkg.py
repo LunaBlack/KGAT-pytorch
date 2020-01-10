@@ -2,7 +2,6 @@ import os
 import random
 import collections
 
-import dgl
 import torch
 import numpy as np
 import pandas as pd
@@ -16,7 +15,7 @@ class DataLoaderECFKG(object):
         self.use_pretrain = args.use_pretrain
         self.pretrain_embedding_dir = args.pretrain_embedding_dir
 
-        self.batch_size = args.batch_size
+        self.train_batch_size = args.train_batch_size
 
         data_dir = os.path.join(args.data_dir, args.data_name)
         train_file = os.path.join(data_dir, 'train.txt')
@@ -182,10 +181,10 @@ class DataLoaderECFKG(object):
 
     def generate_kg_batch(self, kg_dict):
         exist_heads = kg_dict.keys()
-        if self.batch_size <= len(exist_heads):
-            batch_head = random.sample(exist_heads, self.batch_size)
+        if self.train_batch_size <= len(exist_heads):
+            batch_head = random.sample(exist_heads, self.train_batch_size)
         else:
-            batch_head = [random.choice(exist_heads) for _ in range(self.batch_size)]
+            batch_head = [random.choice(exist_heads) for _ in range(self.train_batch_size)]
 
         batch_relation, batch_pos_tail, batch_neg_tail = [], [], []
         for h in batch_head:
