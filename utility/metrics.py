@@ -126,7 +126,8 @@ def calc_metrics_at_k(cf_scores, train_user_dict, test_user_dict, user_ids, item
         cf_scores[idx][train_pos_item_list] = 0
         test_pos_item_binary[idx][test_pos_item_list] = 1
 
-    _, rank_indices = torch.sort(cf_scores.cuda(), descending=True)
+    if torch.cuda.is_available(): cf_scores = cf_scores.cuda()
+    _, rank_indices = torch.sort(cf_scores, descending=True)
     rank_indices = rank_indices.cpu()
 
     binary_hit = []

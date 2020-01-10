@@ -32,6 +32,7 @@ def evaluate(model, dataloader, user_ids, K, use_cuda, device):
 
     item_ids = list(range(n_items))
     user_item_pairs = itertools.product(user_ids, item_ids)
+    user_idx_map = dict(zip(user_ids, range(n_users)))
 
     cf_scores = torch.zeros([len(user_ids), len(item_ids)])
     if use_cuda:
@@ -52,7 +53,7 @@ def evaluate(model, dataloader, user_ids, K, use_cuda, device):
 
             with torch.no_grad():
                 batch_scores = model.predict(feature_values)            # (batch_size)
-            cf_scores[[user_ids.index(u) for u in batch_user], batch_item] = batch_scores
+            cf_scores[[user_idx_map[u] for u in batch_user], batch_item] = batch_scores
             pbar.update(1)
 
     cf_scores = cf_scores.cpu()
