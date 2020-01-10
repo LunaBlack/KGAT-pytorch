@@ -17,3 +17,7 @@ BPRMF   65.0    0.014154779163154574    0.13356850621872207     0.06943918307731
 
 BPRMF   : Precision 0.0142   Recall 0.1336   NDCG 0.0694
 
+
+ECFKG: https://github.com/evison/KBE4ExplainableRecommendation
+
+
