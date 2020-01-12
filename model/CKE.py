@@ -44,9 +44,9 @@ class CKE(nn.Module):
         else:
             nn.init.xavier_uniform_(self.item_embed.weight, gain=nn.init.calculate_gain('relu'))
 
-        nn.init.xavier_uniform(self.entity_embed.weight, gain=nn.init.calculate_gain('relu'))
-        nn.init.xavier_uniform(self.relation_embed.weight, gain=nn.init.calculate_gain('relu'))
-        nn.init.xavier_uniform(self.trans_M, gain=nn.init.calculate_gain('relu'))
+        nn.init.xavier_uniform_(self.entity_embed.weight, gain=nn.init.calculate_gain('relu'))
+        nn.init.xavier_uniform_(self.relation_embed.weight, gain=nn.init.calculate_gain('relu'))
+        nn.init.xavier_uniform_(self.trans_M, gain=nn.init.calculate_gain('relu'))
 
 
     def calc_kg_loss(self, h, r, pos_t, neg_t):

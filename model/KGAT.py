@@ -101,7 +101,7 @@ class KGAT(nn.Module):
             self.entity_user_embed.weight = nn.Parameter(entity_user_embed)
 
         self.W_R = nn.Parameter(torch.Tensor(self.n_relations, self.entity_dim, self.relation_dim))
-        nn.init.xavier_uniform(self.W_R, gain=nn.init.calculate_gain('relu'))
+        nn.init.xavier_uniform_(self.W_R, gain=nn.init.calculate_gain('relu'))
 
         self.aggregator_layers = nn.ModuleList()
         for k in range(self.n_layers):
