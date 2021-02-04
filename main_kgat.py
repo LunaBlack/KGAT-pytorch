@@ -111,6 +111,7 @@ def train(args):
     if use_cuda:
         train_nodes = train_nodes.to(device)
         train_edges = train_edges.to(device)
+        train_graph = train_graph.to(device)
     train_graph.ndata['id'] = train_nodes
     train_graph.edata['type'] = train_edges
 
@@ -120,6 +121,7 @@ def train(args):
     if use_cuda:
         test_nodes = test_nodes.to(device)
         test_edges = test_edges.to(device)
+        test_graph = test_graph.to(device)
     test_graph.ndata['id'] = test_nodes
     test_graph.edata['type'] = test_edges
 
@@ -262,6 +264,7 @@ def predict(args):
     if use_cuda:
         train_nodes = train_nodes.to(device)
         train_edges = train_edges.to(device)
+        train_graph = train_graph.to(device)
     train_graph.ndata['id'] = train_nodes
     train_graph.edata['type'] = train_edges
 
@@ -271,6 +274,7 @@ def predict(args):
     if use_cuda:
         test_nodes = test_nodes.to(device)
         test_edges = test_edges.to(device)
+        test_graph = test_graph.to(device)
     test_graph.ndata['id'] = test_nodes
     test_graph.edata['type'] = test_edges
 
