@@ -34,27 +34,27 @@ The code has been tested running under Python 3.6.8. The required packages are a
 ## Run the Codes
 * FM
 ```
-python main_nfm.py --model_type fm --dataset amazon-book
+python main_nfm.py --model_type fm --data_name amazon-book
 ```
 * NFM
 ```
-python main_nfm.py --model_type nfm --dataset amazon-book
+python main_nfm.py --model_type nfm --data_name amazon-book
 ```
 * BPRMF *(train on multi-GPUs)*
 ```
-python -m torch.distributed.launch main_bprmf.py --dataset amazon-book
+python -m torch.distributed.launch main_bprmf.py --data_name amazon-book
 ```
 * ECFKG *(train on multi-GPUs)*
 ```
-python -m torch.distributed.launch main_ecfkg.py --dataset amazon-book
+python -m torch.distributed.launch main_ecfkg.py --data_name amazon-book
 ```
 * CKE *(train on multi-GPUs)*
 ```
-python -m torch.distributed.launch main_cke.py --dataset amazon-book
+python -m torch.distributed.launch main_cke.py --data_name amazon-book
 ```
 * KGAT
 ```
-python main_kgat.py --dataset amazon-book
+python main_kgat.py --data_name amazon-book
 ```
 
 ## Results
