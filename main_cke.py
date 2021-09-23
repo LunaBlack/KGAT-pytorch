@@ -18,7 +18,7 @@ from model.CKE import CKE
 from utility.parser_cke import *
 from utility.log_helper import *
 from utility.metrics import *
-from utility.helper import *
+from utility.model_helper import *
 from utility.loader_cke import DataLoaderCKE
 
 
@@ -33,6 +33,7 @@ def evaluate(model, train_user_dict, test_user_dict, user_ids_batches, item_ids,
     precision = []
     recall = []
     ndcg = []
+    ndcg_truncate = []
 
     with torch.no_grad():
         for user_ids_batch in user_ids_batches:
@@ -40,18 +41,20 @@ def evaluate(model, train_user_dict, test_user_dict, user_ids_batches, item_ids,
 
             cf_scores_batch = cf_scores_batch.cpu()
             user_ids_batch = user_ids_batch.cpu().numpy()
-            precision_batch, recall_batch, ndcg_batch = calc_metrics_at_k(cf_scores_batch, train_user_dict, test_user_dict, user_ids_batch, item_ids_batch, K)
+            precision_batch, recall_batch, ndcg_batch, ndcg_truncate_batch = calc_metrics_at_k(cf_scores_batch, train_user_dict, test_user_dict, user_ids_batch, item_ids_batch, K)
 
             cf_scores.append(cf_scores_batch.numpy())
             precision.append(precision_batch)
             recall.append(recall_batch)
             ndcg.append(ndcg_batch)
+            ndcg_truncate.append(ndcg_truncate_batch)
 
     cf_scores = np.concatenate(cf_scores, axis=0)
     precision_k = sum(np.concatenate(precision)) / n_users
     recall_k = sum(np.concatenate(recall)) / n_users
     ndcg_k = sum(np.concatenate(ndcg)) / n_users
-    return cf_scores, precision_k, recall_k, ndcg_k
+    ndcg_truncate_k = sum(np.concatenate(ndcg_truncate)) / n_users
+    return cf_scores, precision_k, recall_k, ndcg_k, ndcg_truncate_k
 
 
 def train(args):
@@ -108,6 +111,7 @@ def train(args):
     precision_list = []
     recall_list = []
     ndcg_list = []
+    ndcg_truncate_list = []
 
     # train model
     for epoch in range(1, args.n_epoch + 1):
@@ -150,13 +154,14 @@ def train(args):
         # evaluate cf
         if (epoch % args.evaluate_every) == 0:
             time1 = time()
-            _, precision, recall, ndcg = evaluate(model, data.train_user_dict, data.test_user_dict, user_ids_batches, item_ids, args.K)
+            _, precision, recall, ndcg, ndcg_truncate = evaluate(model, data.train_user_dict, data.test_user_dict, user_ids_batches, item_ids, args.K)
             logging.info('CF Evaluation: Epoch {:04d} | Total Time {:.1f}s | Precision {:.4f} Recall {:.4f} NDCG {:.4f}'.format(epoch, time() - time1, precision, recall, ndcg))
 
             epoch_list.append(epoch)
             precision_list.append(precision)
             recall_list.append(recall)
             ndcg_list.append(ndcg)
+            ndcg_truncate_list.append(ndcg_truncate)
             best_recall, should_stop = early_stopping(recall_list, args.stopping_steps)
 
             if should_stop:
@@ -171,16 +176,17 @@ def train(args):
     save_model(model, args.save_dir, epoch)
 
     # save metrics
-    _, precision, recall, ndcg = evaluate(model, data.train_user_dict, data.test_user_dict, user_ids_batches, item_ids, args.K)
+    _, precision, recall, ndcg, ndcg_truncate = evaluate(model, data.train_user_dict, data.test_user_dict, user_ids_batches, item_ids, args.K)
     logging.info('Final CF Evaluation: Precision {:.4f} Recall {:.4f} NDCG {:.4f}'.format(precision, recall, ndcg))
 
     epoch_list.append(epoch)
     precision_list.append(precision)
     recall_list.append(recall)
     ndcg_list.append(ndcg)
+    ndcg_truncate_list.append(ndcg_truncate)
 
-    metrics = pd.DataFrame([epoch_list, precision_list, recall_list, ndcg_list]).transpose()
-    metrics.columns = ['epoch_idx', 'precision@{}'.format(args.K), 'recall@{}'.format(args.K), 'ndcg@{}'.format(args.K)]
+    metrics = pd.DataFrame([epoch_list, precision_list, recall_list, ndcg_list, ndcg_truncate_list]).transpose()
+    metrics.columns = ['epoch_idx', 'precision@{}'.format(args.K), 'recall@{}'.format(args.K), 'ndcg@{}'.format(args.K), 'ndcg@{}_truncate'.format(args.K)]
     metrics.to_csv(args.save_dir + '/metrics.tsv', sep='\t', index=False)
 
 
@@ -211,9 +217,9 @@ def predict(args):
     model.to(device)
 
     # predict
-    cf_scores, precision, recall, ndcg = evaluate(model, data.train_user_dict, data.test_user_dict, user_ids_batches, item_ids, args.K)
+    cf_scores, precision, recall, ndcg, ndcg_truncate = evaluate(model, data.train_user_dict, data.test_user_dict, user_ids_batches, item_ids, args.K)
     np.save(args.save_dir + 'cf_scores.npy', cf_scores)
-    print('CF Evaluation: Precision {:.4f} Recall {:.4f} NDCG {:.4f}'.format(precision, recall, ndcg))
+    print('CF Evaluation: Precision {:.4f} Recall {:.4f} NDCG {:.4f} NDCG_Truncate {:.4f}'.format(precision, recall, ndcg, ndcg_truncate))
 
 
 

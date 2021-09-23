@@ -72,9 +72,14 @@ def ndcg_at_k_batch(hits, k):
     sorted_hits_k = np.flip(np.sort(hits), axis=1)[:, :k]
     idcg = np.sum((2 ** sorted_hits_k - 1) / np.log2(np.arange(2, k + 2)), axis=1)
     idcg[idcg == 0] = np.inf
+    ndcg = (dcg / idcg)
 
-    res = (dcg / idcg)
-    return res
+    sorted_hits_truncate_k = np.flip(np.sort(hits_k), axis=1)
+    idcg_truncate = np.sum((2 ** sorted_hits_truncate_k - 1) / np.log2(np.arange(2, k + 2)), axis=1)
+    idcg_truncate[idcg_truncate == 0] = np.inf
+    ndcg_truncate = (dcg / idcg_truncate)
+
+    return ndcg, ndcg_truncate
 
 
 def recall_at_k(hit, k, all_pos_num):
@@ -123,7 +128,7 @@ def calc_metrics_at_k(cf_scores, train_user_dict, test_user_dict, user_ids, item
     for idx, u in enumerate(user_ids):
         train_pos_item_list = train_user_dict[u]
         test_pos_item_list = test_user_dict[u]
-        cf_scores[idx][train_pos_item_list] = 0
+        cf_scores[idx][train_pos_item_list] = -np.inf
         test_pos_item_binary[idx][test_pos_item_list] = 1
 
     try:
@@ -139,7 +144,7 @@ def calc_metrics_at_k(cf_scores, train_user_dict, test_user_dict, user_ids, item
 
     precision = precision_at_k_batch(binary_hit, K)
     recall = recall_at_k_batch(binary_hit, K)
-    ndcg = ndcg_at_k_batch(binary_hit, K)
-    return precision, recall, ndcg
+    ndcg, ndcg_truncate = ndcg_at_k_batch(binary_hit, K)
+    return precision, recall, ndcg, ndcg_truncate
 
 

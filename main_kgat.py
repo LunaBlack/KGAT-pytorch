@@ -17,7 +17,7 @@ from model.KGAT import KGAT
 from utility.parser_kgat import *
 from utility.log_helper import *
 from utility.metrics import *
-from utility.helper import *
+from utility.model_helper import *
 from utility.loader_kgat import DataLoaderKGAT
 
 
@@ -35,6 +35,7 @@ def evaluate(model, train_graph, train_user_dict, test_user_dict, user_ids_batch
     precision = []
     recall = []
     ndcg = []
+    ndcg_truncate = []
 
     with torch.no_grad():
         for user_ids_batch in user_ids_batches:

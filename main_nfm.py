@@ -16,7 +16,7 @@ from model.NFM import NFM
 from utility.parser_nfm import *
 from utility.log_helper import *
 from utility.metrics import *
-from utility.helper import *
+from utility.model_helper import *
 from utility.loader_nfm import DataLoaderNFM
 
 

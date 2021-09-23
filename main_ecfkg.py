@@ -18,7 +18,7 @@ from model.ECFKG import ECFKG
 from utility.parser_ecfkg import *
 from utility.log_helper import *
 from utility.metrics import *
-from utility.helper import *
+from utility.model_helper import *
 from utility.loader_ecfkg import DataLoaderECFKG
 
 
@@ -33,6 +33,7 @@ def evaluate(model, user_ids_batches, item_ids, relation_u2i_id, train_user_dict
     precision = []
     recall = []
     ndcg = []
+    ndcg_truncate = []
 
     with torch.no_grad():
         for user_ids_batch in user_ids_batches:

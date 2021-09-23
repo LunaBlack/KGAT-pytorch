@@ -3,7 +3,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from dgl.nn.pytorch.softmax import edge_softmax
-from utility.helper import edge_softmax_fix
+from utility.model_helper import edge_softmax_fix
 
 
 def _L2_loss_mean(x):
