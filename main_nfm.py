@@ -16,42 +16,35 @@ from utils.model_helper import *
 from data_loader.loader_nfm import DataLoaderNFM
 
 
-def evaluate(model, dataloader, user_ids, K, use_cuda, device):
-    n_users = len(user_ids)             # user number in test data
-    n_items = dataloader.n_items
-    n_entities = dataloader.n_entities
+def evaluate(model, dataloader, K, device):
     test_batch_size = dataloader.test_batch_size
     train_user_dict = dataloader.train_user_dict
     test_user_dict = dataloader.test_user_dict
 
     model.eval()
 
+    user_ids = list(test_user_dict.keys())
+    user_ids_batches = [user_ids[i: i + test_batch_size] for i in range(0, len(user_ids), test_batch_size)]
+
+    n_users = len(user_ids)
+    n_items = dataloader.n_items
     item_ids = list(range(n_items))
-    user_item_pairs = itertools.product(user_ids, item_ids)
     user_idx_map = dict(zip(user_ids, range(n_users)))
 
     cf_users = []
     cf_items = []
     cf_scores = []
-    n_test_batch = n_users * n_items // test_batch_size + 1
 
-    with tqdm(total=n_test_batch, desc='Evaluating Iteration') as pbar:
-        while True:
-            batch_pairs = list(itertools.islice(user_item_pairs, test_batch_size))
-            if len(batch_pairs) == 0:
-                break
-
-            batch_user = [p[0] for p in batch_pairs]
-            batch_item = [p[1] for p in batch_pairs]
-            feature_values = dataloader.generate_test_batch(batch_user, batch_item)
-            if use_cuda:
-                feature_values = feature_values.to(device)
+    with tqdm(total=len(user_ids_batches), desc='Evaluating Iteration') as pbar:
+        for batch_user in user_ids_batches:
+            feature_values = dataloader.generate_test_batch(batch_user)
+            feature_values = feature_values.to(device)
 
             with torch.no_grad():
                 batch_scores = model(feature_values, is_train=False)            # (batch_size)
 
-            cf_users.extend(batch_user)
-            cf_items.extend(batch_item)
+            cf_users.extend(np.repeat(batch_user, n_items).tolist())
+            cf_items.extend(item_ids * len(batch_user))
             cf_scores.append(batch_scores.cpu())
             pbar.update(1)
 
@@ -84,7 +77,6 @@ def train(args):
     logging.info(args)
 
     # GPU / CPU
-    use_cuda = torch.cuda.is_available()
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
     # load data
@@ -94,12 +86,6 @@ def train(args):
         item_pre_embed = torch.tensor(data.item_pre_embed)
     else:
         user_pre_embed, item_pre_embed = None, None
-
-    user_ids = list(data.test_user_dict.keys())
-    if args.n_evaluate_users and 0 < args.n_evaluate_users < len(user_ids):
-        sample_user_ids = random.sample(user_ids, args.n_evaluate_users)
-    else:
-        sample_user_ids = user_ids
 
     # construct model & optimizer
     model = NFM(args, data.n_users, data.n_items, data.n_entities, user_pre_embed, item_pre_embed)
@@ -114,9 +100,11 @@ def train(args):
     # initialize metrics
     best_epoch = -1
     epoch_list = []
+
     precision_list = []
     recall_list = []
     ndcg_list = []
+    ndcg_truncate_list = []
 
     # train model
     for epoch in range(1, args.n_epoch + 1):
@@ -131,9 +119,8 @@ def train(args):
         for iter in range(1, n_batch + 1):
             time2 = time()
             pos_feature_values, neg_feature_values = data.generate_train_batch(data.train_user_dict)
-            if use_cuda:
-                pos_feature_values = pos_feature_values.to(device)
-                neg_feature_values = neg_feature_values.to(device)
+            pos_feature_values = pos_feature_values.to(device)
+            neg_feature_values = neg_feature_values.to(device)
             batch_loss = model([pos_feature_values, neg_feature_values], is_train=True)
 
             batch_loss.backward()
@@ -148,13 +135,14 @@ def train(args):
         # evaluate cf
         if (epoch % args.evaluate_every) == 0:
             time1 = time()
-            _, precision, recall, ndcg, ndcg_truncate = evaluate(model, data, sample_user_ids, args.K, use_cuda, device)
+            _, precision, recall, ndcg, ndcg_truncate = evaluate(model, data, args.K, device)
             logging.info('CF Evaluation: Epoch {:04d} | Total Time {:.1f}s | Precision {:.4f} Recall {:.4f} NDCG {:.4f} Truncated NDCG {:.4f}'.format(epoch, time() - time1, precision, recall, ndcg, ndcg_truncate))
 
             epoch_list.append(epoch)
             precision_list.append(precision)
             recall_list.append(recall)
             ndcg_list.append(ndcg)
+            ndcg_truncate_list.append(ndcg_truncate)
             best_recall, should_stop = early_stopping(recall_list, args.stopping_steps)
 
             if should_stop:
@@ -169,16 +157,17 @@ def train(args):
     save_model(model, args.save_dir, epoch)
 
     # save metrics
-    _, precision, recall, ndcg, ndcg_truncate = evaluate(model, data, sample_user_ids, args.K, use_cuda, device)
+    _, precision, recall, ndcg, ndcg_truncate = evaluate(model, data, args.K, device)
     logging.info('Final CF Evaluation: Precision {:.4f} Recall {:.4f} NDCG {:.4f}  Truncated NDCG {:.4f}'.format(precision, recall, ndcg, ndcg_truncate))
 
     epoch_list.append(epoch)
     precision_list.append(precision)
     recall_list.append(recall)
     ndcg_list.append(ndcg)
+    ndcg_truncate_list.append(ndcg_truncate)
 
-    metrics = pd.DataFrame([epoch_list, precision_list, recall_list, ndcg_list]).transpose()
-    metrics.columns = ['epoch_idx', 'precision@{}'.format(args.K), 'recall@{}'.format(args.K), 'ndcg@{}'.format(args.K)]
+    metrics = pd.DataFrame([epoch_list, precision_list, recall_list, ndcg_list, ndcg_truncate_list]).transpose()
+    metrics.columns = ['epoch_idx', 'precision@{}'.format(args.K), 'recall@{}'.format(args.K), 'ndcg@{}'.format(args.K), 'ndcg_truncate@{}'.format(args.K)]
     metrics.to_csv(args.save_dir + '/metrics.tsv', sep='\t', index=False)
 
 
@@ -190,12 +179,10 @@ def predict(args):
     torch.cuda.manual_seed_all(args.seed)
 
     # GPU / CPU
-    use_cuda = torch.cuda.is_available()
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
     # load data
     data = DataLoaderNFM(args, logging)
-    user_ids = list(data.test_user_dict.keys())
 
     # load model
     model = NFM(args, data.n_users, data.n_items, data.n_entities)
@@ -203,7 +190,7 @@ def predict(args):
     model.to(device)
 
     # predict
-    cf_scores, precision, recall, ndcg, ndcg_truncate = evaluate(model, data, user_ids, args.K, use_cuda, device)
+    cf_scores, precision, recall, ndcg, ndcg_truncate = evaluate(model, data, args.K, device)
     np.save(args.save_dir + 'cf_scores.npy', cf_scores)
     print('CF Evaluation: Precision {:.4f} Recall {:.4f} NDCG {:.4f}  Truncated NDCG {:.4f}'.format(precision, recall, ndcg, ndcg_truncate))
 
@@ -212,6 +199,6 @@ def predict(args):
 if __name__ == '__main__':
     args = parse_nfm_args()
     train(args)
-    predict(args)
+    # predict(args)
 
 

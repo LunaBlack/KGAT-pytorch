@@ -97,9 +97,15 @@ class DataLoaderNFM(DataLoaderBase):
         return pos_feature_values, neg_feature_values
 
 
-    def generate_test_batch(self, batch_user, batch_item):
-        batch_user_sp = self.user_matrix[np.array(batch_user) - self.n_entities]
-        batch_item_sp = self.feat_matrix[batch_item]
+    def generate_test_batch(self, batch_user):
+        n_rows = len(batch_user) * self.n_items
+        user_rows = list(range(n_rows))
+        user_cols = np.repeat([u - self.n_entities for u in batch_user], self.n_items)
+        user_data = [1] * n_rows
+
+        batch_user_sp = sp.coo_matrix((user_data, (user_rows, user_cols)), shape=(n_rows, self.n_users)).tocsr()
+        batch_item_sp = sp.vstack([self.feat_matrix] * len(batch_user))
+
         feature_values = sp.hstack([batch_item_sp, batch_user_sp])
         feature_values = self.convert_coo2tensor(feature_values.tocoo())
         return feature_values

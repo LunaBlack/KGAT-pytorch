@@ -2,25 +2,6 @@ import os
 from collections import OrderedDict
 
 import torch
-from dgl import function as fn
-
-
-# DGL: dgl-cu90(0.4.1)
-# We will get different results when using the function `fn.sum`, and the randomness is due to `atomicAdd`.
-# Use custom function to ensure deterministic behavior.
-def edge_softmax_fix(graph, score):
-
-    def reduce_sum(nodes):
-        accum = torch.sum(nodes.mailbox['temp'], 1)
-        return {'out_sum': accum}
-
-    graph = graph.local_var()
-    graph.edata['out'] = score
-    graph.edata['out'] = torch.exp(graph.edata['out'])
-    graph.update_all(fn.copy_e('out', 'temp'), reduce_sum)
-    graph.apply_edges(fn.e_div_v('out', 'out_sum', 'out'))
-    out = graph.edata['out']
-    return out
 
 
 def early_stopping(recall_list, stopping_steps):

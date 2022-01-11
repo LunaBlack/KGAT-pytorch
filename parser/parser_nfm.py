@@ -33,7 +33,7 @@ def parse_nfm_args():
 
     parser.add_argument('--train_batch_size', type=int, default=1024,
                         help='Train batch size.')
-    parser.add_argument('--test_batch_size', type=int, default=1000000,
+    parser.add_argument('--test_batch_size', type=int, default=300,
                         help='Test batch size.')
 
     parser.add_argument('--lr', type=float, default=0.0001,
@@ -47,8 +47,6 @@ def parse_nfm_args():
                         help='Iter interval of printing loss.')
     parser.add_argument('--evaluate_every', type=int, default=1,
                         help='Epoch interval of evaluating CF.')
-    parser.add_argument('--n_evaluate_users', type=int, default=10000,
-                        help='Number of sampled users when evaluating CF.')
 
     parser.add_argument('--K', type=int, default=20,
                         help='Calculate metric@K when evaluating.')
