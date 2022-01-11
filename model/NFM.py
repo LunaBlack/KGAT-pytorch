@@ -39,12 +39,13 @@ class NFM(nn.Module):
         self.n_features = n_entities + n_users
 
         self.embed_dim = args.embed_dim
+        self.l2loss_lambda = args.l2loss_lambda
 
         self.hidden_dim_list = [args.embed_dim] + eval(args.hidden_dim_list)
         self.mess_dropout = eval(args.mess_dropout)
         self.n_layers = len(eval(args.hidden_dim_list))
 
-        self.linear = nn.Linear(self.n_features, 1)
+        self.linear = nn.Linear(self.n_features, 1, bias=False)
 
         if (self.use_pretrain == 1) and (user_pre_embed is not None) and (item_pre_embed is not None):
             other_entity_embed = nn.Parameter(torch.Tensor(self.n_entities - item_pre_embed.shape[0], self.embed_dim))
@@ -71,18 +72,15 @@ class NFM(nn.Module):
             self.h = nn.Linear(self.hidden_dim_list[-1], 1, bias=False)
 
 
-    def predict(self, feature_values):
+    def calc_score(self, feature_values):
         """
         feature_values:   (batch_size, n_features), n_features = n_entities + n_users, torch.sparse.FloatTensor
         """
         # Bi-Interaction layer
         # Equation (4) / (3)
-        sum_square_embed = torch.sparse.mm(feature_values, self.feature_embed).pow(2)           # (batch_size, embed_dim)
-        square_sum_embed = torch.sparse.mm(feature_values.pow(2), self.feature_embed.pow(2))    # (batch_size, embed_dim)
-        bi = 0.5 * (sum_square_embed - square_sum_embed)                                        # (batch_size, embed_dim)
-
-        # Hidden layers
-        z = self.dropout(bi)                                # (batch_size, embed_dim)
+        sum_square_embed = torch.mm(feature_values, self.feature_embed).pow(2)           # (batch_size, embed_dim)
+        square_sum_embed = torch.mm(feature_values.pow(2), self.feature_embed.pow(2))    # (batch_size, embed_dim)
+        z = 0.5 * (sum_square_embed - square_sum_embed)                                         # (batch_size, embed_dim)
 
         if self.model_type == 'nfm':
             # Equation (5)
@@ -97,19 +95,25 @@ class NFM(nn.Module):
         return y.squeeze()                                  # (batch_size)
 
 
-    def calc_loss(self, pos_feature_value, neg_feature_value):
+    def forward(self, feature_values, is_train):
         """
-        pos_feature_value:  (batch_size, n_features), torch.sparse.FloatTensor
-        neg_feature_value:  (batch_size, n_features), torch.sparse.FloatTensor
+        pos_feature_values:  (batch_size, n_features), torch.sparse.FloatTensor
+        neg_feature_values:  (batch_size, n_features), torch.sparse.FloatTensor
         """
-        pos_score = self.predict(pos_feature_value)         # (batch_size)
-        neg_score = self.predict(neg_feature_value)         # (batch_size)
+        if is_train:
+            pos_feature_values, neg_feature_values = feature_values
+            pos_scores = self.calc_score(pos_feature_values)         # (batch_size)
+            neg_scores = self.calc_score(neg_feature_values)         # (batch_size)
 
-        loss = (-1.0) * F.logsigmoid(pos_score - neg_score)
-        loss = torch.mean(loss)
-        return loss
+            loss = (-1.0) * torch.log(1e-10 + F.sigmoid(pos_scores - neg_scores))
+            loss = torch.mean(loss)
 
+            if self.model_type == 'nfm':
+                l2_loss = torch.norm(self.h.weight, 2).pow(2) / 2
+                loss += self.l2loss_lambda * l2_loss
+            return loss
 
-
-
+        else:
+            scores = self.calc_score(feature_values)
+            return scores
 

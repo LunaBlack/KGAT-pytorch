@@ -4,7 +4,7 @@ import argparse
 def parse_nfm_args():
     parser = argparse.ArgumentParser(description="Run NFM.")
 
-    parser.add_argument('--seed', type=int, default=123,
+    parser.add_argument('--seed', type=int, default=2019,
                         help='Random seed.')
 
     parser.add_argument('--model_type', nargs='?', default='nfm',
@@ -28,10 +28,12 @@ def parse_nfm_args():
                         help='Output sizes of every hidden layer.')
     parser.add_argument('--mess_dropout', nargs='?', default='[0.1, 0.1]',
                         help='Dropout probability w.r.t. message dropout for bi-interaction layer and each hidden layer. 0: no dropout.')
+    parser.add_argument('--l2loss_lambda', type=float, default=1e-5,
+                        help='Lambda when calculating l2 loss.')
 
     parser.add_argument('--train_batch_size', type=int, default=1024,
                         help='Train batch size.')
-    parser.add_argument('--test_batch_size', type=int, default=1048576,
+    parser.add_argument('--test_batch_size', type=int, default=1000000,
                         help='Test batch size.')
 
     parser.add_argument('--lr', type=float, default=0.0001,
@@ -45,7 +47,7 @@ def parse_nfm_args():
                         help='Iter interval of printing loss.')
     parser.add_argument('--evaluate_every', type=int, default=1,
                         help='Epoch interval of evaluating CF.')
-    parser.add_argument('--n_evaluate_users', type=int, default=1000,
+    parser.add_argument('--n_evaluate_users', type=int, default=10000,
                         help='Number of sampled users when evaluating CF.')
 
     parser.add_argument('--K', type=int, default=20,
