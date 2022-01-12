@@ -33,8 +33,10 @@ def parse_nfm_args():
 
     parser.add_argument('--train_batch_size', type=int, default=1024,
                         help='Train batch size.')
-    parser.add_argument('--test_batch_size', type=int, default=300,
+    parser.add_argument('--test_batch_size', type=int, default=50,
                         help='Test batch size.')
+    parser.add_argument('--test_cores', type=int, default=32,
+                        help='Number of cores when evaluating.')
 
     parser.add_argument('--lr', type=float, default=0.0001,
                         help='Learning rate.')
