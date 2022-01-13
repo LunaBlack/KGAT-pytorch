@@ -36,7 +36,7 @@ class NFM(nn.Module):
         self.n_users = n_users
         self.n_items = n_items
         self.n_entities = n_entities
-        self.n_features = n_entities + n_users
+        self.n_features = n_users + n_entities
 
         self.embed_dim = args.embed_dim
         self.l2loss_lambda = args.l2loss_lambda
@@ -50,8 +50,8 @@ class NFM(nn.Module):
         if (self.use_pretrain == 1) and (user_pre_embed is not None) and (item_pre_embed is not None):
             other_entity_embed = nn.Parameter(torch.Tensor(self.n_entities - item_pre_embed.shape[0], self.embed_dim))
             nn.init.xavier_uniform_(other_entity_embed, gain=nn.init.calculate_gain('relu'))
-            entity_user_embed = torch.cat([item_pre_embed, other_entity_embed, user_pre_embed], dim=0)
-            self.feature_embed = nn.Parameter(entity_user_embed)
+            user_entity_embed = torch.cat([user_pre_embed, item_pre_embed, other_entity_embed], dim=0)
+            self.feature_embed = nn.Parameter(user_entity_embed)
         else:
             self.feature_embed = nn.Parameter(torch.Tensor(self.n_features, self.embed_dim))
             nn.init.xavier_uniform_(self.feature_embed, gain=nn.init.calculate_gain('relu'))

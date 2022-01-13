@@ -89,8 +89,8 @@ class DataLoaderNFM(DataLoaderBase):
         batch_pos_item_sp = self.feat_matrix[batch_pos_item]
         batch_neg_item_sp = self.feat_matrix[batch_neg_item]
 
-        pos_feature_values = sp.hstack([batch_pos_item_sp, batch_user_sp])
-        neg_feature_values = sp.hstack([batch_neg_item_sp, batch_user_sp])
+        pos_feature_values = sp.hstack([batch_user_sp, batch_pos_item_sp])
+        neg_feature_values = sp.hstack([batch_user_sp, batch_neg_item_sp])
 
         pos_feature_values = self.convert_coo2tensor(pos_feature_values.tocoo())
         neg_feature_values = self.convert_coo2tensor(neg_feature_values.tocoo())
@@ -106,7 +106,7 @@ class DataLoaderNFM(DataLoaderBase):
         batch_user_sp = sp.coo_matrix((user_data, (user_rows, user_cols)), shape=(n_rows, self.n_users)).tocsr()
         batch_item_sp = sp.vstack([self.feat_matrix] * len(batch_user))
 
-        feature_values = sp.hstack([batch_item_sp, batch_user_sp])
+        feature_values = sp.hstack([batch_user_sp, batch_item_sp])
         feature_values = self.convert_coo2tensor(feature_values.tocoo())
         return feature_values
 
