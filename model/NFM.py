@@ -76,7 +76,7 @@ class NFM(nn.Module):
 
     def calc_score(self, feature_values):
         """
-        feature_values:   (batch_size, n_features), n_features = n_entities + n_users, torch.sparse.FloatTensor
+        feature_values:   (batch_size, n_features), n_features = n_users + n_entities, torch.sparse.FloatTensor
         """
         # Bi-Interaction layer
         # Equation (4) / (3)
@@ -97,24 +97,26 @@ class NFM(nn.Module):
         return y.squeeze()                                  # (batch_size)
 
 
-    def forward(self, feature_values, is_train):
+    def calc_loss(self, pos_feature_values, neg_feature_values):
         """
         pos_feature_values:  (batch_size, n_features), torch.sparse.FloatTensor
         neg_feature_values:  (batch_size, n_features), torch.sparse.FloatTensor
         """
+        pos_scores = self.calc_score(pos_feature_values)            # (batch_size)
+        neg_scores = self.calc_score(neg_feature_values)            # (batch_size)
+
+        loss = (-1.0) * torch.log(1e-10 + F.sigmoid(pos_scores - neg_scores))
+        loss = torch.mean(loss)
+
+        l2_loss = torch.norm(self.h.weight, 2).pow(2) / 2
+        loss += self.l2loss_lambda * l2_loss
+        return loss
+
+
+    def forward(self, *input, is_train):
         if is_train:
-            pos_feature_values, neg_feature_values = feature_values
-            pos_scores = self.calc_score(pos_feature_values)         # (batch_size)
-            neg_scores = self.calc_score(neg_feature_values)         # (batch_size)
-
-            loss = (-1.0) * torch.log(1e-10 + F.sigmoid(pos_scores - neg_scores))
-            loss = torch.mean(loss)
-
-            l2_loss = torch.norm(self.h.weight, 2).pow(2) / 2
-            loss += self.l2loss_lambda * l2_loss
-            return loss
-
+            return self.calc_loss(*input)
         else:
-            scores = self.calc_score(feature_values)
-            return scores
+            return self.calc_score(*input)
+
 

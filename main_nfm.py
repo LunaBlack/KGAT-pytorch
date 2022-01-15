@@ -179,7 +179,7 @@ def train(args):
             pos_feature_values, neg_feature_values = data.generate_train_batch(data.train_user_dict)
             pos_feature_values = pos_feature_values.to(device)
             neg_feature_values = neg_feature_values.to(device)
-            batch_loss = model([pos_feature_values, neg_feature_values], is_train=True)
+            batch_loss = model(pos_feature_values, neg_feature_values, is_train=True)
 
             if np.isnan(batch_loss.cpu().detach().numpy()):
                 logging.info('ERROR: Epoch {:04d} Iter {:04d} / {:04d} Loss is nan.'.format(epoch, iter, n_batch))
@@ -233,12 +233,6 @@ def train(args):
 
 
 def predict(args):
-    # seed
-    random.seed(args.seed)
-    np.random.seed(args.seed)
-    torch.manual_seed(args.seed)
-    torch.cuda.manual_seed_all(args.seed)
-
     # GPU / CPU
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 

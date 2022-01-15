@@ -4,10 +4,7 @@ import argparse
 def parse_bprmf_args():
     parser = argparse.ArgumentParser(description="Run BPRMF.")
 
-    parser.add_argument('--local_rank', type=int, default=0,
-                        help='Local rank for using multi GPUs.')
-
-    parser.add_argument('--seed', type=int, default=123,
+    parser.add_argument('--seed', type=int, default=2019,
                         help='Random seed.')
 
     parser.add_argument('--data_name', nargs='?', default='amazon-book',
@@ -30,7 +27,7 @@ def parse_bprmf_args():
     parser.add_argument('--train_batch_size', type=int, default=1024,
                         help='Train batch size.')
     parser.add_argument('--test_batch_size', type=int, default=10000,
-                        help='Test batch size (the user number to test every batch).')
+                        help='Test batch size (the number of users to test every batch).')
 
     parser.add_argument('--lr', type=float, default=0.0001,
                         help='Learning rate.')
@@ -41,10 +38,10 @@ def parse_bprmf_args():
 
     parser.add_argument('--print_every', type=int, default=1,
                         help='Iter interval of printing loss.')
-    parser.add_argument('--evaluate_every', type=int, default=1,
+    parser.add_argument('--evaluate_every', type=int, default=10,
                         help='Epoch interval of evaluating CF.')
 
-    parser.add_argument('--K', type=int, default=20,
+    parser.add_argument('--Ks', nargs='?', default='[20, 40, 60, 80, 100]',
                         help='Calculate metric@K when evaluating.')
 
     args = parser.parse_args()

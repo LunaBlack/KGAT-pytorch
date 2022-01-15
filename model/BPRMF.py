@@ -27,15 +27,15 @@ class BPRMF(nn.Module):
         if (self.use_pretrain == 1) and (user_pre_embed is not None):
             self.user_embed.weight = nn.Parameter(user_pre_embed)
         else:
-            nn.init.xavier_uniform_(self.user_embed.weight, gain=nn.init.calculate_gain('relu'))
+            nn.init.xavier_uniform_(self.user_embed.weight)
 
         if (self.use_pretrain == 1) and (item_pre_embed is not None):
             self.item_embed.weight = nn.Parameter(item_pre_embed)
         else:
-            nn.init.xavier_uniform_(self.item_embed.weight, gain=nn.init.calculate_gain('relu'))
+            nn.init.xavier_uniform_(self.item_embed.weight)
 
 
-    def predict(self, user_ids, item_ids):
+    def calc_score(self, user_ids, item_ids):
         """
         user_ids:   number of users to evaluate   (n_eval_users)
         item_ids:   number of items to evaluate   (n_eval_items)
@@ -67,9 +67,10 @@ class BPRMF(nn.Module):
         return loss
 
 
-    def forward(self, mode, *input):
-        if mode == 'train':
+    def forward(self, *input, is_train):
+        if is_train:
             return self.calc_loss(*input)
-
+        else:
+            return self.calc_score(*input)
 
 
