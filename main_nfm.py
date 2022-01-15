@@ -1,3 +1,4 @@
+import sys
 import random
 import itertools
 from time import time
@@ -17,7 +18,7 @@ from utils.model_helper import *
 from data_loader.loader_nfm import DataLoaderNFM
 
 
-def evaluate_batch(model, dataloader, user_ids, K):
+def evaluate_batch(model, dataloader, user_ids, Ks):
     train_user_dict = dataloader.train_user_dict
     test_user_dict = dataloader.test_user_dict
 
@@ -36,13 +37,13 @@ def evaluate_batch(model, dataloader, user_ids, K):
 
     user_ids = np.array(user_ids)
     item_ids = np.array(item_ids)
-    precision_k, recall_k, ndcg_k, ndcg_truncate_k = calc_metrics_at_k(score_matrix, train_user_dict, test_user_dict, user_ids, item_ids, K)
+    metrics_dict = calc_metrics_at_k(score_matrix, train_user_dict, test_user_dict, user_ids, item_ids, Ks)
 
     score_matrix = score_matrix.numpy()
-    return score_matrix, precision_k, recall_k, ndcg_k, ndcg_truncate_k
+    return score_matrix, metrics_dict
 
 
-def evaluate_mp(model, dataloader, K, num_processes, device):
+def evaluate_mp(model, dataloader, Ks, num_processes, device):
     test_batch_size = dataloader.test_batch_size
     test_user_dict = dataloader.test_user_dict
 
@@ -53,26 +54,21 @@ def evaluate_mp(model, dataloader, K, num_processes, device):
     user_ids_batches = [user_ids[i: i + test_batch_size] for i in range(0, len(user_ids), test_batch_size)]
 
     pool = mp.Pool(num_processes)
-    res = pool.starmap(evaluate_batch, [(model, dataloader, batch_user, K) for batch_user in user_ids_batches])
+    res = pool.starmap(evaluate_batch, [(model, dataloader, batch_user, Ks) for batch_user in user_ids_batches])
     pool.close()
 
-    score_matrix    = np.concatenate([r[0] for r in res], axis=0)
-    precision_k     = np.concatenate([r[1] for r in res])
-    recall_k        = np.concatenate([r[2] for r in res])
-    ndcg_k          = np.concatenate([r[3] for r in res])
-    ndcg_truncate_k = np.concatenate([r[4] for r in res])
-
-    precision_k = precision_k.mean()
-    recall_k = recall_k.mean()
-    ndcg_k = ndcg_k.mean()
-    ndcg_truncate_k = ndcg_truncate_k.mean()
+    score_matrix = np.concatenate([r[0] for r in res], axis=0)
+    metrics_dict = {k: {} for k in Ks}
+    for k in Ks:
+        for m in ['precision', 'recall', 'ndcg']:
+            metrics_dict[k][m] = np.concatenate([r[1][k][m] for r in res]).mean()
 
     torch.cuda.empty_cache()
     model.to(device)
-    return score_matrix, precision_k, recall_k, ndcg_k, ndcg_truncate_k
+    return score_matrix, metrics_dict
 
 
-def evaluate(model, dataloader, K, num_processes, device):
+def evaluate(model, dataloader, Ks, num_processes, device):
     test_batch_size = dataloader.test_batch_size
     train_user_dict = dataloader.train_user_dict
     test_user_dict = dataloader.test_user_dict
@@ -111,14 +107,13 @@ def evaluate(model, dataloader, K, num_processes, device):
 
     user_ids = np.array(user_ids)
     item_ids = np.array(item_ids)
-    precision_k, recall_k, ndcg_k, ndcg_truncate_k = calc_metrics_at_k(cf_score_matrix, train_user_dict, test_user_dict, user_ids, item_ids, K)
+    metrics_dict = calc_metrics_at_k(cf_score_matrix, train_user_dict, test_user_dict, user_ids, item_ids, Ks)
 
     cf_score_matrix = cf_score_matrix.numpy()
-    precision_k = precision_k.mean()
-    recall_k = recall_k.mean()
-    ndcg_k = ndcg_k.mean()
-    ndcg_truncate_k = ndcg_truncate_k.mean()
-    return cf_score_matrix, precision_k, recall_k, ndcg_k, ndcg_truncate_k
+    for k in Ks:
+        for m in ['precision', 'recall', 'ndcg']:
+            metrics_dict[k][m] = metrics_dict[k][m].mean()
+    return cf_score_matrix, metrics_dict
 
 
 def train(args):
@@ -155,12 +150,14 @@ def train(args):
 
     # initialize metrics
     best_epoch = -1
-    epoch_list = []
+    best_recall = 0
 
-    precision_list = []
-    recall_list = []
-    ndcg_list = []
-    ndcg_truncate_list = []
+    Ks = eval(args.Ks)
+    k_min = min(Ks)
+    k_max = max(Ks)
+
+    epoch_list = []
+    metrics_list = {k: {'precision': [], 'recall': [], 'ndcg': []} for k in Ks}
 
     num_processes = args.test_cores
     if num_processes and num_processes > 1:
@@ -170,7 +167,6 @@ def train(args):
 
     # train model
     for epoch in range(1, args.n_epoch + 1):
-        time0 = time()
         model.train()
 
         # train cf
@@ -185,6 +181,10 @@ def train(args):
             neg_feature_values = neg_feature_values.to(device)
             batch_loss = model([pos_feature_values, neg_feature_values], is_train=True)
 
+            if np.isnan(batch_loss.cpu().detach().numpy()):
+                logging.info('ERROR: Epoch {:04d} Iter {:04d} / {:04d} Loss is nan.'.format(epoch, iter, n_batch))
+                sys.exit()
+
             batch_loss.backward()
             optimizer.step()
             optimizer.zero_grad()
@@ -195,42 +195,41 @@ def train(args):
         logging.info('CF Training: Epoch {:04d} Total Iter {:04d} | Total Time {:.1f}s | Iter Mean Loss {:.4f}'.format(epoch, n_batch, time() - time1, total_loss / n_batch))
 
         # evaluate cf
-        if (epoch % args.evaluate_every) == 0:
-            time1 = time()
-            _, precision, recall, ndcg, ndcg_truncate = evaluate_func(model, data, args.K, num_processes, device)
-            logging.info('CF Evaluation: Epoch {:04d} | Total Time {:.1f}s | Precision {:.4f} Recall {:.4f} NDCG {:.4f} Truncated NDCG {:.4f}'.format(epoch, time() - time1, precision, recall, ndcg, ndcg_truncate))
+        if (epoch % args.evaluate_every) == 0 or epoch == args.n_epoch:
+            time3 = time()
+            _, metrics_dict = evaluate_func(model, data, Ks, num_processes, device)
+            logging.info('CF Evaluation: Epoch {:04d} | Total Time {:.1f}s | Precision [{:.4f}, {:.4f}], Recall [{:.4f}, {:.4f}], NDCG [{:.4f}, {:.4f}]'.format(
+                epoch, time() - time3, metrics_dict[k_min]['precision'], metrics_dict[k_max]['precision'], metrics_dict[k_min]['recall'], metrics_dict[k_max]['recall'], metrics_dict[k_min]['ndcg'], metrics_dict[k_max]['ndcg']))
 
             epoch_list.append(epoch)
-            precision_list.append(precision)
-            recall_list.append(recall)
-            ndcg_list.append(ndcg)
-            ndcg_truncate_list.append(ndcg_truncate)
-            best_recall, should_stop = early_stopping(recall_list, args.stopping_steps)
+            for k in Ks:
+                for m in ['precision', 'recall', 'ndcg']:
+                    metrics_list[k][m].append(metrics_dict[k][m])
+            best_recall, should_stop = early_stopping(metrics_list[k_min]['recall'], args.stopping_steps)
 
             if should_stop:
                 break
 
-            if recall_list.index(best_recall) == len(recall_list) - 1:
+            if metrics_list[k_min]['recall'].index(best_recall) == len(epoch_list) - 1:
                 save_model(model, args.save_dir, epoch, best_epoch)
                 logging.info('Save model on epoch {:04d}!'.format(epoch))
                 best_epoch = epoch
 
-    # save model
-    save_model(model, args.save_dir, epoch)
-
     # save metrics
-    _, precision, recall, ndcg, ndcg_truncate = evaluate_func(model, data, args.K, num_processes, device)
-    logging.info('Final CF Evaluation: Precision {:.4f} Recall {:.4f} NDCG {:.4f}  Truncated NDCG {:.4f}'.format(precision, recall, ndcg, ndcg_truncate))
+    metrics_df = [epoch_list]
+    metrics_cols = ['epoch_idx']
+    for k in Ks:
+        for m in ['precision', 'recall', 'ndcg']:
+            metrics_df.append(metrics_list[k][m])
+            metrics_cols.append('{}@{}'.format(m, k))
+    metrics_df = pd.DataFrame(metrics_df).transpose()
+    metrics_df.columns = metrics_cols
+    metrics_df.to_csv(args.save_dir + '/metrics.tsv', sep='\t', index=False)
 
-    epoch_list.append(epoch)
-    precision_list.append(precision)
-    recall_list.append(recall)
-    ndcg_list.append(ndcg)
-    ndcg_truncate_list.append(ndcg_truncate)
-
-    metrics = pd.DataFrame([epoch_list, precision_list, recall_list, ndcg_list, ndcg_truncate_list]).transpose()
-    metrics.columns = ['epoch_idx', 'precision@{}'.format(args.K), 'recall@{}'.format(args.K), 'ndcg@{}'.format(args.K), 'ndcg_truncate@{}'.format(args.K)]
-    metrics.to_csv(args.save_dir + '/metrics.tsv', sep='\t', index=False)
+    # print best metrics
+    best_metrics = metrics_df.loc[metrics_df['epoch_idx'] == best_epoch].iloc[0].to_dict()
+    logging.info('Best CF Evaluation: Epoch {:04d} | Precision [{:.4f}, {:.4f}], Recall [{:.4f}, {:.4f}], NDCG [{:.4f}, {:.4f}]'.format(
+        int(best_metrics['epoch_idx']), best_metrics['precision@{}'.format(k_min)], best_metrics['precision@{}'.format(k_max)], best_metrics['recall@{}'.format(k_min)], best_metrics['recall@{}'.format(k_max)], best_metrics['ndcg@{}'.format(k_min)], best_metrics['ndcg@{}'.format(k_max)]))
 
 
 def predict(args):
@@ -258,9 +257,14 @@ def predict(args):
     else:
         evaluate_func = evaluate
 
-    cf_scores, precision, recall, ndcg, ndcg_truncate = evaluate_func(model, data, args.K, num_processes, device)
+    Ks = eval(args.Ks)
+    k_min = min(Ks)
+    k_max = max(Ks)
+
+    cf_scores, metrics_dict = evaluate_func(model, data, Ks, num_processes, device)
     np.save(args.save_dir + 'cf_scores.npy', cf_scores)
-    print('CF Evaluation: Precision {:.4f} Recall {:.4f} NDCG {:.4f}  Truncated NDCG {:.4f}'.format(precision, recall, ndcg, ndcg_truncate))
+    print('CF Evaluation: Precision [{:.4f}, {:.4f}], Recall [{:.4f}, {:.4f}], NDCG [{:.4f}, {:.4f}]'.format(
+        metrics_dict[k_min]['precision'], metrics_dict[k_max]['precision'], metrics_dict[k_min]['recall'], metrics_dict[k_max]['recall'], metrics_dict[k_min]['ndcg'], metrics_dict[k_max]['ndcg']))
 
 
 

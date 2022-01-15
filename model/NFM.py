@@ -15,6 +15,8 @@ class HiddenLayer(nn.Module):
         self.activation = nn.ReLU()
         self.message_dropout = nn.Dropout(dropout)
 
+        nn.init.xavier_uniform_(self.linear.weight)
+
 
     def forward(self, x):
         out = self.linear(x)
@@ -45,18 +47,17 @@ class NFM(nn.Module):
         self.mess_dropout = eval(args.mess_dropout)
         self.n_layers = len(eval(args.hidden_dim_list))
 
-        self.linear = nn.Linear(self.n_features, 1, bias=False)
+        self.linear = nn.Linear(self.n_features, 1)
+        nn.init.xavier_uniform_(self.linear.weight)
 
         if (self.use_pretrain == 1) and (user_pre_embed is not None) and (item_pre_embed is not None):
             other_entity_embed = nn.Parameter(torch.Tensor(self.n_entities - item_pre_embed.shape[0], self.embed_dim))
-            nn.init.xavier_uniform_(other_entity_embed, gain=nn.init.calculate_gain('relu'))
+            nn.init.xavier_uniform_(other_entity_embed)
             user_entity_embed = torch.cat([user_pre_embed, item_pre_embed, other_entity_embed], dim=0)
             self.feature_embed = nn.Parameter(user_entity_embed)
         else:
             self.feature_embed = nn.Parameter(torch.Tensor(self.n_features, self.embed_dim))
-            nn.init.xavier_uniform_(self.feature_embed, gain=nn.init.calculate_gain('relu'))
-
-        self.dropout = nn.Dropout(self.mess_dropout[0])
+            nn.init.xavier_uniform_(self.feature_embed)
 
         if self.model_type == 'fm':
             self.h = nn.Linear(self.embed_dim, 1, bias=False)
@@ -68,8 +69,9 @@ class NFM(nn.Module):
         elif self.model_type == 'nfm':
             self.hidden_layers = nn.ModuleList()
             for idx in range(self.n_layers):
-                self.hidden_layers.append(HiddenLayer(self.hidden_dim_list[idx], self.hidden_dim_list[idx + 1], self.mess_dropout[idx + 1]))
+                self.hidden_layers.append(HiddenLayer(self.hidden_dim_list[idx], self.hidden_dim_list[idx + 1], self.mess_dropout[idx]))
             self.h = nn.Linear(self.hidden_dim_list[-1], 1, bias=False)
+            nn.init.xavier_uniform_(self.h.weight)
 
 
     def calc_score(self, feature_values):
@@ -108,9 +110,8 @@ class NFM(nn.Module):
             loss = (-1.0) * torch.log(1e-10 + F.sigmoid(pos_scores - neg_scores))
             loss = torch.mean(loss)
 
-            if self.model_type == 'nfm':
-                l2_loss = torch.norm(self.h.weight, 2).pow(2) / 2
-                loss += self.l2loss_lambda * l2_loss
+            l2_loss = torch.norm(self.h.weight, 2).pow(2) / 2
+            loss += self.l2loss_lambda * l2_loss
             return loss
 
         else:
