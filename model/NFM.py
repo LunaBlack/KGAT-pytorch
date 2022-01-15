@@ -76,13 +76,13 @@ class NFM(nn.Module):
 
     def calc_score(self, feature_values):
         """
-        feature_values:   (batch_size, n_features), n_features = n_users + n_entities, torch.sparse.FloatTensor
+        feature_values:  (batch_size, n_features), n_features = n_users + n_entities, torch.sparse.FloatTensor
         """
         # Bi-Interaction layer
         # Equation (4) / (3)
         sum_square_embed = torch.mm(feature_values, self.feature_embed).pow(2)           # (batch_size, embed_dim)
         square_sum_embed = torch.mm(feature_values.pow(2), self.feature_embed.pow(2))    # (batch_size, embed_dim)
-        z = 0.5 * (sum_square_embed - square_sum_embed)                                         # (batch_size, embed_dim)
+        z = 0.5 * (sum_square_embed - square_sum_embed)                                  # (batch_size, embed_dim)
 
         if self.model_type == 'nfm':
             # Equation (5)

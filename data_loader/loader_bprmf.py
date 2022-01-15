@@ -1,7 +1,3 @@
-import os
-import random
-import collections
-
 import torch
 import numpy as np
 import pandas as pd
@@ -25,17 +21,7 @@ class DataLoaderBPRMF(DataLoaderBase):
 
 
     def generate_train_batch(self, user_dict):
-        exist_users = user_dict.keys()
-        if self.train_batch_size <= len(exist_users):
-            batch_user = random.sample(exist_users, self.train_batch_size)
-        else:
-            batch_user = [random.choice(exist_users) for _ in range(self.train_batch_size)]
-
-        batch_pos_item, batch_neg_item = [], []
-        for u in batch_user:
-            batch_pos_item += self.sample_pos_items_for_u(user_dict, u, 1)
-            batch_neg_item += self.sample_neg_items_for_u(user_dict, u, 1)
-
+        batch_user, batch_pos_item, batch_neg_item = self.generate_cf_batch(user_dict, self.train_batch_size)
         batch_user = torch.LongTensor(batch_user)
         batch_pos_item = torch.LongTensor(batch_pos_item)
         batch_neg_item = torch.LongTensor(batch_neg_item)

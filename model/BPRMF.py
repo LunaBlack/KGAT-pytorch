@@ -37,12 +37,12 @@ class BPRMF(nn.Module):
 
     def calc_score(self, user_ids, item_ids):
         """
-        user_ids:   number of users to evaluate   (n_eval_users)
-        item_ids:   number of items to evaluate   (n_eval_items)
+        user_ids:   (n_users)
+        item_ids:   (n_items)
         """
-        user_embed = self.user_embed(user_ids)                              # (n_eval_users, embed_dim)
-        item_embed = self.item_embed(item_ids)                              # (n_eval_items, embed_dim)
-        cf_score = torch.matmul(user_embed, item_embed.transpose(0, 1))     # (n_eval_users, n_eval_items)
+        user_embed = self.user_embed(user_ids)                              # (n_users, embed_dim)
+        item_embed = self.item_embed(item_ids)                              # (n_items, embed_dim)
+        cf_score = torch.matmul(user_embed, item_embed.transpose(0, 1))     # (n_users, n_items)
         return cf_score
 
 
