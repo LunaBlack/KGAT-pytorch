@@ -107,6 +107,10 @@ class DataLoaderBase(object):
         for u in batch_user:
             batch_pos_item += self.sample_pos_items_for_u(user_dict, u, 1)
             batch_neg_item += self.sample_neg_items_for_u(user_dict, u, 1)
+
+        batch_user = torch.LongTensor(batch_user)
+        batch_pos_item = torch.LongTensor(batch_pos_item)
+        batch_neg_item = torch.LongTensor(batch_neg_item)
         return batch_user, batch_pos_item, batch_neg_item
 
 

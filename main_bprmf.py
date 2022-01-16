@@ -114,7 +114,7 @@ def train(args):
 
         for iter in range(1, n_batch + 1):
             time2 = time()
-            batch_user, batch_pos_item, batch_neg_item = data.generate_train_batch(data.train_user_dict)
+            batch_user, batch_pos_item, batch_neg_item = data.generate_cf_batch(data.train_user_dict, data.train_batch_size)
             batch_user = batch_user.to(device)
             batch_pos_item = batch_pos_item.to(device)
             batch_neg_item = batch_neg_item.to(device)

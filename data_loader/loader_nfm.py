@@ -69,9 +69,9 @@ class DataLoaderNFM(DataLoaderBase):
 
     def generate_train_batch(self, user_dict):
         batch_user, batch_pos_item, batch_neg_item = self.generate_cf_batch(user_dict, self.train_batch_size)
-        batch_user_sp = self.user_matrix[[i - self.n_entities for i in batch_user]]
-        batch_pos_item_sp = self.feat_matrix[batch_pos_item]
-        batch_neg_item_sp = self.feat_matrix[batch_neg_item]
+        batch_user_sp = self.user_matrix[[i - self.n_entities for i in batch_user.numpy()]]
+        batch_pos_item_sp = self.feat_matrix[batch_pos_item.numpy()]
+        batch_neg_item_sp = self.feat_matrix[batch_neg_item.numpy()]
 
         pos_feature_values = sp.hstack([batch_user_sp, batch_pos_item_sp])
         neg_feature_values = sp.hstack([batch_user_sp, batch_neg_item_sp])

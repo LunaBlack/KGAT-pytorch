@@ -37,16 +37,16 @@ class CKE(nn.Module):
         if (self.use_pretrain == 1) and (user_pre_embed is not None):
             self.user_embed.weight = nn.Parameter(user_pre_embed)
         else:
-            nn.init.xavier_uniform_(self.user_embed.weight, gain=nn.init.calculate_gain('relu'))
+            nn.init.xavier_uniform_(self.user_embed.weight)
 
         if (self.use_pretrain == 1) and (item_pre_embed is not None):
             self.item_embed.weight = nn.Parameter(item_pre_embed)
         else:
-            nn.init.xavier_uniform_(self.item_embed.weight, gain=nn.init.calculate_gain('relu'))
+            nn.init.xavier_uniform_(self.item_embed.weight)
 
-        nn.init.xavier_uniform_(self.entity_embed.weight, gain=nn.init.calculate_gain('relu'))
-        nn.init.xavier_uniform_(self.relation_embed.weight, gain=nn.init.calculate_gain('relu'))
-        nn.init.xavier_uniform_(self.trans_M, gain=nn.init.calculate_gain('relu'))
+        nn.init.xavier_uniform_(self.entity_embed.weight)
+        nn.init.xavier_uniform_(self.relation_embed.weight)
+        nn.init.xavier_uniform_(self.trans_M)
 
 
     def calc_kg_loss(self, h, r, pos_t, neg_t):
@@ -106,7 +106,7 @@ class CKE(nn.Module):
         pos_score = torch.sum(user_embed * item_pos_cf_embed, dim=1)    # (cf_batch_size)
         neg_score = torch.sum(user_embed * item_neg_cf_embed, dim=1)    # (cf_batch_size)
 
-        cf_loss = (-1.0) * F.logsigmoid(pos_score - neg_score)
+        cf_loss = (-1.0) * torch.log(1e-10 + F.sigmoid(pos_score - neg_score))
         cf_loss = torch.mean(cf_loss)
 
         l2_loss = _L2_loss_mean(user_embed) + _L2_loss_mean(item_pos_cf_embed) + _L2_loss_mean(item_neg_cf_embed)
@@ -131,24 +131,25 @@ class CKE(nn.Module):
         return loss
 
 
-    def predict(self, user_ids, item_ids):
+    def calc_score(self, user_ids, item_ids):
         """
-        user_ids:   number of users to evaluate   (n_eval_users)
-        item_ids:   number of items to evaluate   (n_eval_items)
+        user_ids:   number of users to evaluate   (n_users)
+        item_ids:   number of items to evaluate   (n_items)
         """
-        user_embed = self.user_embed(user_ids)                  # (n_eval_users, embed_dim)
-        item_embed = self.item_embed(item_ids)                  # (n_eval_items, embed_dim)
+        user_embed = self.user_embed(user_ids)                  # (n_users, embed_dim)
 
-        item_kg_embed = self.entity_embed(item_ids)             # (n_eval_items, embed_dim)
-        item_cf_embed = item_embed + item_kg_embed              # (n_eval_items, embed_dim)
+        item_embed = self.item_embed(item_ids)                  # (n_items, embed_dim)
+        item_kg_embed = self.entity_embed(item_ids)             # (n_items, embed_dim)
+        item_cf_embed = item_embed + item_kg_embed              # (n_items, embed_dim)
 
-        cf_score = torch.matmul(user_embed, item_cf_embed.transpose(0, 1))      # (n_eval_users, n_eval_items)
+        cf_score = torch.matmul(user_embed, item_cf_embed.transpose(0, 1))      # (n_users, n_items)
         return cf_score
 
 
-    def forward(self, mode, *input):
-        if mode == 'train':
+    def forward(self, *input, is_train):
+        if is_train:
             return self.calc_loss(*input)
-
+        else:
+            return self.calc_score(*input)
 
 

@@ -4,10 +4,7 @@ import argparse
 def parse_cke_args():
     parser = argparse.ArgumentParser(description="Run CKE.")
 
-    parser.add_argument('--local_rank', type=int, default=0,
-                        help='Local rank for using multi GPUs.')
-
-    parser.add_argument('--seed', type=int, default=123,
+    parser.add_argument('--seed', type=int, default=2019,
                         help='Random seed.')
 
     parser.add_argument('--data_name', nargs='?', default='amazon-book',
@@ -48,10 +45,10 @@ def parse_cke_args():
 
     parser.add_argument('--print_every', type=int, default=1,
                         help='Iter interval of printing CF loss.')
-    parser.add_argument('--evaluate_every', type=int, default=1,
+    parser.add_argument('--evaluate_every', type=int, default=10,
                         help='Epoch interval of evaluating CF.')
 
-    parser.add_argument('--K', type=int, default=20,
+    parser.add_argument('--Ks', nargs='?', default='[20, 40, 60, 80, 100]',
                         help='Calculate metric@K when evaluating.')
 
     args = parser.parse_args()

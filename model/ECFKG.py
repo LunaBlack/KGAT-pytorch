@@ -60,8 +60,7 @@ class ECFKG(nn.Module):
         pos_score = torch.sum((h_embed + r_embed) * pos_t_embed, dim=1)      # (batch_size)
         neg_score = torch.sum((h_embed + r_embed) * neg_t_embed, dim=1)      # (batch_size)
 
-        loss_func = nn.BCEWithLogitsLoss()
-        kg_loss = loss_func(pos_score, torch.ones_like(pos_score)) + loss_func(neg_score, torch.zeros_like(neg_score))
+        kg_loss = (F.softplus(-pos_score) + F.softplus(neg_score)).mean()
         return kg_loss
 
 

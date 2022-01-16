@@ -37,9 +37,9 @@ class CKE(nn.Module):
         self.relation_embed = nn.Embedding(self.n_relations, self.relation_dim)
         self.trans_M = nn.Parameter(torch.Tensor(self.n_relations, self.embed_dim, self.relation_dim))
 
-        nn.init.xavier_uniform_(self.entity_embed.weight, gain=nn.init.calculate_gain('relu'))
-        nn.init.xavier_uniform_(self.relation_embed.weight, gain=nn.init.calculate_gain('relu'))
-        nn.init.xavier_uniform_(self.trans_M, gain=nn.init.calculate_gain('relu'))
+        nn.init.xavier_uniform_(self.entity_embed.weight)
+        nn.init.xavier_uniform_(self.relation_embed.weight)
+        nn.init.xavier_uniform_(self.trans_M)
 
         # Textual Embedding
         self.sdae_loss_fn = nn.MSELoss()
@@ -49,14 +49,14 @@ class CKE(nn.Module):
         for idx in range(len(sdae_encoder_dim_list) - 1):
             in_dim = sdae_encoder_dim_list[idx]
             out_dim = sdae_encoder_dim_list[idx + 1]
-            self.sdae_encoder.add_module('sdae_encoder_{idx}'.format(idx=idx), nn.Sequential(nn.Linear(in_dim, out_dim), nn.LeakyReLU()))
+            self.sdae_encoder.add_module('sdae_encoder_{idx}'.format(idx=idx), nn.Sequential(nn.Linear(in_dim, out_dim), nn.Sigmoid()))
 
         self.sdae_decoder = nn.Sequential()
         sdae_decoder_dim_list = [self.embed_dim] + args.sdae_dim_list[::-1] + [n_vocab]
         for idx in range(len(sdae_decoder_dim_list) - 1):
             in_dim = sdae_decoder_dim_list[idx]
             out_dim = sdae_decoder_dim_list[idx + 1]
-            self.sdae_decoder.add_module('sdae_decoder_{idx}'.format(idx=idx), nn.Sequential(nn.Linear(in_dim, out_dim), nn.LeakyReLU()))
+            self.sdae_decoder.add_module('sdae_decoder_{idx}'.format(idx=idx), nn.Sequential(nn.Linear(in_dim, out_dim), nn.Sigmoid()))
 
         # Visual Embedding
         self.scae_loss_fn = nn.MSELoss()
@@ -69,10 +69,10 @@ class CKE(nn.Module):
             out_channels = scae_encoder_channel_list[idx + 1]
             kernel_size = scae_encoder_kernel_list[idx]
             padding = int((kernel_size - 1) / 2)
-            self.scae_encoder.add_module('scae_encoder_{idx}'.format(idx=idx), nn.Sequential(nn.Conv2d(in_channels, out_channels, kernel_size, padding=padding), nn.LeakyReLU()))
+            self.scae_encoder.add_module('scae_encoder_{idx}'.format(idx=idx), nn.Sequential(nn.Conv2d(in_channels, out_channels, kernel_size, padding=padding), nn.Sigmoid()))
 
-        self.scae_full_connect_encoder = nn.Sequential(nn.Linear(scae_encoder_channel_list[-1] * self.image_height * self.image_width, self.embed_dim), nn.LeakyReLU())
-        self.scae_full_connect_decoder = nn.Sequential(nn.Linear(self.embed_dim, scae_encoder_channel_list[-1] * self.image_height * self.image_width), nn.LeakyReLU())
+        self.scae_full_connect_encoder = nn.Sequential(nn.Linear(scae_encoder_channel_list[-1] * self.image_height * self.image_width, self.embed_dim), nn.Sigmoid())
+        self.scae_full_connect_decoder = nn.Sequential(nn.Linear(self.embed_dim, scae_encoder_channel_list[-1] * self.image_height * self.image_width), nn.Sigmoid())
 
         self.scae_decoder = nn.Sequential()
         scae_decoder_channel_list = args.scae_channel_list[::-1] + [3]
@@ -82,7 +82,7 @@ class CKE(nn.Module):
             out_channels = scae_decoder_channel_list[idx + 1]
             kernel_size = scae_decoder_kernel_list[idx]
             padding = int((kernel_size - 1) / 2)
-            self.scae_decoder.add_module('scae_decoder_{idx}'.format(idx=idx), nn.Sequential(nn.Conv2d(in_channels, out_channels, kernel_size, padding=padding), nn.LeakyReLU()))
+            self.scae_decoder.add_module('scae_decoder_{idx}'.format(idx=idx), nn.Sequential(nn.Conv2d(in_channels, out_channels, kernel_size, padding=padding), nn.Sigmoid()))
 
         # cf
         self.cf_l2loss_lambda = args.cf_l2loss_lambda
@@ -93,11 +93,11 @@ class CKE(nn.Module):
         if (self.use_pretrain == 1) and (user_pre_embed is not None):
             self.user_embed.weight = nn.Parameter(user_pre_embed)
         else:
-            nn.init.xavier_uniform_(self.user_embed.weight, gain=nn.init.calculate_gain('relu'))
+            nn.init.xavier_uniform_(self.user_embed.weight)
         if (self.use_pretrain == 1) and (item_pre_embed is not None):
             self.item_embed.weight = nn.Parameter(item_pre_embed)
         else:
-            nn.init.xavier_uniform_(self.item_embed.weight, gain=nn.init.calculate_gain('relu'))
+            nn.init.xavier_uniform_(self.item_embed.weight)
 
 
     def calc_kg_loss(self, h, r, pos_t, neg_t):
@@ -256,17 +256,24 @@ class CKE(nn.Module):
         return loss
 
 
-    def predict(self, user_ids, item_ids, item_textual_embed, item_visual_embed):
+    def calc_score(self, user_ids, item_ids, item_textual_embed, item_visual_embed):
         """
-        user_ids:           (n_eval_users), number of users to evaluate
-        item_ids:           (n_eval_items), number of items to evaluate
-        item_textual_embed: (n_eval_items, n_vocab)
-        item_visual_embed:  (n_eval_items, raw_channel=3, image_height, image_width)
+        user_ids:           (n_users), number of users to evaluate
+        item_ids:           (n_items), number of items to evaluate
+        item_textual_embed: (n_items, n_vocab)
+        item_visual_embed:  (n_items, raw_channel=3, image_height, image_width)
         """
-        user_embed = self.user_embed(user_ids)                                                          # (n_eval_users, embed_dim)
-        item_cf_embed = self.generate_item_cf_embed(item_ids, item_textual_embed, item_visual_embed)    # (n_eval_items, embed_dim)
-        cf_score = torch.matmul(user_embed, item_cf_embed.transpose(0, 1))                              # (n_eval_users, n_eval_items)
+        user_embed = self.user_embed(user_ids)                                                          # (n_users, embed_dim)
+        item_cf_embed = self.generate_item_cf_embed(item_ids, item_textual_embed, item_visual_embed)    # (n_items, embed_dim)
+        cf_score = torch.matmul(user_embed, item_cf_embed.transpose(0, 1))                              # (n_users, n_items)
         return cf_score
+
+
+    def forward(self, *input, is_train):
+        if is_train:
+            return self.calc_loss(*input)
+        else:
+            return self.calc_score(*input)
 
 
 
@@ -349,37 +356,34 @@ if __name__ == '__main__':
     print(model)
 
     # calculate loss
-    loss = model.calc_loss(h, r, pos_t, neg_t,
-                           masked_textual_embed, textual_embed,
-                           masked_visual_embed, visual_embed,
-                           user_ids, item_pos_ids, item_neg_ids, item_pos_textual_embed, item_neg_textual_embed, item_pos_visual_embed, item_neg_visual_embed)
+    loss = model(h, r, pos_t, neg_t,
+                 masked_textual_embed, textual_embed,
+                 masked_visual_embed, visual_embed,
+                 user_ids, item_pos_ids, item_neg_ids, item_pos_textual_embed, item_neg_textual_embed, item_pos_visual_embed, item_neg_visual_embed,
+                 is_train=True)
     print(loss.item())
 
     # train model
     for iter in range(30):
-        loss = model.calc_loss(h, r, pos_t, neg_t,
-                               masked_textual_embed, textual_embed,
-                               masked_visual_embed, visual_embed,
-                               user_ids, item_pos_ids, item_neg_ids, item_pos_textual_embed, item_neg_textual_embed, item_pos_visual_embed, item_neg_visual_embed)
+        loss = model(h, r, pos_t, neg_t,
+                     masked_textual_embed, textual_embed,
+                     masked_visual_embed, visual_embed,
+                     user_ids, item_pos_ids, item_neg_ids, item_pos_textual_embed, item_neg_textual_embed, item_pos_visual_embed, item_neg_visual_embed,
+                     is_train=True)
         loss.backward()
         optimizer.step()
         optimizer.zero_grad()
         print('Iter {}: '.format(iter + 1), loss.item())
 
     # cf predicting input
-    n_eval_users = n_users
-    n_eval_items = n_items
-
-    eval_user_ids = torch.LongTensor(np.arange(n_eval_users))
-    eval_item_ids = torch.LongTensor(np.arange(n_eval_items))
-    eval_item_textual_embed = torch.FloatTensor(np.random.randint(vocab_occu_max, size=[n_eval_items, n_vocab])) / vocab_occu_max
-    eval_item_visual_embed = torch.FloatTensor(np.random.randint(rbg_value_max, size=[n_eval_items, image_channel, args.image_height, args.image_width])) / rbg_value_max
+    user_ids = torch.LongTensor(np.arange(n_users))
+    item_ids = torch.LongTensor(np.arange(n_items))
+    item_textual_embed = torch.FloatTensor(np.random.randint(vocab_occu_max, size=[n_items, n_vocab])) / vocab_occu_max
+    item_visual_embed = torch.FloatTensor(np.random.randint(rbg_value_max, size=[n_items, image_channel, args.image_height, args.image_width])) / rbg_value_max
 
     # predict
     with torch.no_grad():
-        cf_score = model.predict(eval_user_ids, eval_item_ids, eval_item_textual_embed, eval_item_visual_embed)
-    print(cf_score)
-
-
+        cf_score = model(user_ids, item_ids, item_textual_embed, item_visual_embed, is_train=False)
+    print(cf_score.numpy())
 
 
