@@ -20,15 +20,8 @@ class DataLoaderNFM(DataLoaderBase):
 
 
     def construct_data(self, kg_data):
-        # re-map user id
         self.n_entities = max(max(kg_data['h']), max(kg_data['t'])) + 1
         self.n_users_entities = self.n_users + self.n_entities
-
-        self.cf_train_data = (np.array(list(map(lambda d: d + self.n_entities, self.cf_train_data[0]))).astype(np.int32), self.cf_train_data[1].astype(np.int32))
-        self.cf_test_data = (np.array(list(map(lambda d: d + self.n_entities, self.cf_test_data[0]))).astype(np.int32), self.cf_test_data[1].astype(np.int32))
-
-        self.train_user_dict = {k + self.n_entities: np.unique(v).astype(np.int32) for k, v in self.train_user_dict.items()}
-        self.test_user_dict = {k + self.n_entities: np.unique(v).astype(np.int32) for k, v in self.test_user_dict.items()}
 
         # construct feature matrix
         feat_rows = list(range(self.n_items))
@@ -69,7 +62,7 @@ class DataLoaderNFM(DataLoaderBase):
 
     def generate_train_batch(self, user_dict):
         batch_user, batch_pos_item, batch_neg_item = self.generate_cf_batch(user_dict, self.train_batch_size)
-        batch_user_sp = self.user_matrix[[i - self.n_entities for i in batch_user.numpy()]]
+        batch_user_sp = self.user_matrix[batch_user.numpy()]
         batch_pos_item_sp = self.feat_matrix[batch_pos_item.numpy()]
         batch_neg_item_sp = self.feat_matrix[batch_neg_item.numpy()]
 
@@ -84,7 +77,7 @@ class DataLoaderNFM(DataLoaderBase):
     def generate_test_batch(self, batch_user):
         n_rows = len(batch_user) * self.n_items
         user_rows = list(range(n_rows))
-        user_cols = np.repeat([u - self.n_entities for u in batch_user], self.n_items)
+        user_cols = np.repeat(batch_user, self.n_items)
         user_data = [1] * n_rows
 
         batch_user_sp = sp.coo_matrix((user_data, (user_rows, user_cols)), shape=(n_rows, self.n_users)).tocsr()
