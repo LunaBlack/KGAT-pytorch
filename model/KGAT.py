@@ -86,7 +86,7 @@ class KGAT(nn.Module):
         self.relation_dim = args.relation_dim
 
         self.aggregation_type = args.aggregation_type
-        self.conv_dim_list = [args.entity_dim] + eval(args.conv_dim_list)
+        self.conv_dim_list = [args.embed_dim] + eval(args.conv_dim_list)
         self.mess_dropout = eval(args.mess_dropout)
         self.n_layers = len(eval(args.conv_dim_list))
 
