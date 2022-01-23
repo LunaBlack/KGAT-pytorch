@@ -1,4 +1,3 @@
-import numpy as np
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -41,7 +40,7 @@ class Aggregator(nn.Module):
     def forward(self, ego_embeddings, A_in):
         """
         ego_embeddings:  (n_users + n_entities, in_dim)
-        A_in:            (n_users + n_entities, n_users + n_entities)
+        A_in:            (n_users + n_entities, n_users + n_entities), torch.sparse.FloatTensor
         """
         # Equation (3)
         side_embeddings = torch.matmul(A_in, ego_embeddings)
@@ -81,6 +80,8 @@ class KGAT(nn.Module):
         self.n_relations = n_relations
 
         self.A_in = nn.Parameter(A_in)
+        self.A_in.requires_grad = False
+        self.att_batch_size = args.att_batch_size
 
         self.embed_dim = args.embed_dim
         self.relation_dim = args.relation_dim
@@ -113,7 +114,7 @@ class KGAT(nn.Module):
             self.aggregator_layers.append(Aggregator(self.conv_dim_list[k], self.conv_dim_list[k + 1], self.mess_dropout[k], self.aggregation_type))
 
 
-    def calc_embeddings(self):
+    def calc_cf_embeddings(self):
         A_in = self.A_in
         ego_embed = self.entity_user_embed.weight
         all_embed = [ego_embed]
@@ -133,7 +134,7 @@ class KGAT(nn.Module):
         item_pos_ids:   (cf_batch_size)
         item_neg_ids:   (cf_batch_size)
         """
-        all_embed = self.calc_embeddings()                          # (n_users + n_entities, concat_dim)
+        all_embed = self.calc_cf_embeddings()                       # (n_users + n_entities, concat_dim)
         user_embed = all_embed[user_ids]                            # (cf_batch_size, concat_dim)
         item_pos_embed = all_embed[item_pos_ids]                    # (cf_batch_size, concat_dim)
         item_neg_embed = all_embed[item_neg_ids]                    # (cf_batch_size, concat_dim)
@@ -182,7 +183,7 @@ class KGAT(nn.Module):
         return loss
 
 
-    def update_attention(self, h_list, t_list, r_list):
+    def update_attention_batch(self, h_list, t_list, r_list):
         r_embed = self.relation_embed(r_list)
         W_r = self.trans_M[r_list]
 
@@ -193,14 +194,33 @@ class KGAT(nn.Module):
         r_mul_h = torch.bmm(h_embed.unsqueeze(1), W_r).squeeze(1)
         r_mul_t = torch.bmm(t_embed.unsqueeze(1), W_r).squeeze(1)
         v_list = torch.sum(r_mul_t * F.tanh(r_mul_h + r_embed), dim=1)
+        return v_list
+
+
+    def update_attention(self, h_list, t_list, r_list):
+        device = self.A_in.device
+
+        v_list = []
+        n_fold = len(h_list) // self.att_batch_size + 1
+
+        for i in range(n_fold):
+            start = self.att_batch_size * i
+            end = self.att_batch_size * (i + 1)
+
+            batch_h_list = h_list[start: end].to(device)
+            batch_t_list = t_list[start: end].to(device)
+            batch_r_list = r_list[start: end].to(device)
+
+            with torch.no_grad():
+                batch_v_list = self.update_attention_batch(batch_h_list, batch_t_list, batch_r_list)
+            v_list.append(batch_v_list.cpu())
 
         # Equation (5)
-        indices = torch.LongTensor(np.vstack((h_list, t_list)))
-        v_list = torch.FloatTensor(v_list)
+        indices = torch.stack([h_list, t_list])
+        values = torch.cat(v_list)
         shape = self.A_in.shape
-        device = self.A_in.device
-        A_in = torch.sparse.FloatTensor(indices, v_list, torch.Size(shape)).to(device)
-        self.A_in = torch.sparse.softmax(A_in, dim=1)
+        A_in = torch.sparse.FloatTensor(indices, values, torch.Size(shape))
+        self.A_in.data = torch.sparse.softmax(A_in, dim=1).to(device)
 
 
     def calc_score(self, user_ids, item_ids):
@@ -208,7 +228,7 @@ class KGAT(nn.Module):
         user_ids:   number of users to evaluate   (n_users)
         item_ids:   number of items to evaluate   (n_items)
         """
-        all_embed = self.calc_embeddings()              # (n_users + n_entities, concat_dim)
+        all_embed = self.calc_cf_embeddings()           # (n_users + n_entities, concat_dim)
         user_embed = all_embed[user_ids]                # (n_users, concat_dim)
         item_embed = all_embed[item_ids]                # (n_items, concat_dim)
 

@@ -44,7 +44,7 @@ def parse_ecfkg_args():
 
     args = parser.parse_args()
 
-    save_dir = 'trained_model/ECFKG/{}/embeddim{}_lr{}_pretrain{}/'.format(
+    save_dir = 'trained_model/ECFKG/{}/embed-dim{}_lr{}_pretrain{}/'.format(
         args.data_name, args.embed_dim, args.lr, args.use_pretrain)
     args.save_dir = save_dir
 

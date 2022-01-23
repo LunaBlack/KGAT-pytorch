@@ -16,6 +16,7 @@ class DataLoaderKGAT(DataLoaderBase):
         super().__init__(args, logging)
         self.cf_batch_size = args.cf_batch_size
         self.kg_batch_size = args.kg_batch_size
+        self.test_batch_size = args.test_batch_size
 
         kg_data = self.load_kg(self.kg_file)
         self.construct_data(kg_data)
@@ -114,7 +115,7 @@ class DataLoaderKGAT(DataLoaderBase):
         def random_walk_norm_lap(adj):
             rowsum = np.array(adj.sum(axis=1))
 
-            d_inv = np.power(rowsum, -1).flatten()
+            d_inv = np.power(rowsum, -1.0).flatten()
             d_inv[np.isinf(d_inv)] = 0
             d_mat_inv = sp.diags(d_inv)
 
@@ -123,7 +124,7 @@ class DataLoaderKGAT(DataLoaderBase):
 
         if self.laplacian_type == 'symmetric':
             norm_lap_func = symmetric_norm_lap
-        elif self.laplacian_type == 'random_walk':
+        elif self.laplacian_type == 'random-walk':
             norm_lap_func = random_walk_norm_lap
         else:
             raise NotImplementedError
@@ -133,7 +134,7 @@ class DataLoaderKGAT(DataLoaderBase):
             self.laplacian_dict[r] = norm_lap_func(adj)
 
         A_in = sum(self.laplacian_dict.values())
-        self.A_in = self.convert_coo2tensor(A_in)
+        self.A_in = self.convert_coo2tensor(A_in.tocoo())
 
 
     def print_info(self, logging):
@@ -142,6 +143,10 @@ class DataLoaderKGAT(DataLoaderBase):
         logging.info('n_entities:        %d' % self.n_entities)
         logging.info('n_users_entities:  %d' % self.n_users_entities)
         logging.info('n_relations:       %d' % self.n_relations)
+
+        logging.info('n_h_list:          %d' % len(self.h_list))
+        logging.info('n_t_list:          %d' % len(self.t_list))
+        logging.info('n_r_list:          %d' % len(self.r_list))
 
         logging.info('n_cf_train:        %d' % self.n_cf_train)
         logging.info('n_cf_test:         %d' % self.n_cf_test)

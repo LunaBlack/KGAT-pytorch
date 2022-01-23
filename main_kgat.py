@@ -69,7 +69,6 @@ def train(args):
     logging.info(args)
 
     # GPU / CPU
-    n_gpu = torch.cuda.device_count()
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
     # load data
@@ -86,8 +85,6 @@ def train(args):
         model = load_model(model, args.pretrain_model_path)
 
     model.to(device)
-    if n_gpu > 1:
-        model = nn.DataParallel(model)
     logging.info(model)
 
     cf_optimizer = optim.Adam(model.parameters(), lr=args.lr)
@@ -143,7 +140,7 @@ def train(args):
 
         for iter in range(1, n_kg_batch + 1):
             time4 = time()
-            kg_batch_head, kg_batch_relation, kg_batch_pos_tail, kg_batch_neg_tail = data.generate_kg_batch(data.train_kg_dict)
+            kg_batch_head, kg_batch_relation, kg_batch_pos_tail, kg_batch_neg_tail = data.generate_kg_batch(data.train_kg_dict, data.kg_batch_size, data.n_users_entities)
             kg_batch_head = kg_batch_head.to(device)
             kg_batch_relation = kg_batch_relation.to(device)
             kg_batch_pos_tail = kg_batch_pos_tail.to(device)
@@ -166,11 +163,8 @@ def train(args):
 
         # update attention
         time5 = time()
-        h_list = data.h_list.to(device)
-        t_list = data.t_list.to(device)
-        r_list = data.r_list.to(device)
-        model(h_list, t_list, r_list, mode='update_att')
-        logging.info('Update attention: Epoch {:04d} | Total Time {:.1f}s'.format(epoch, time() - time5))
+        model(data.h_list, data.t_list, data.r_list, mode='update_att')
+        logging.info('Update Attention: Epoch {:04d} | Total Time {:.1f}s'.format(epoch, time() - time5))
 
         logging.info('CF + KG Training: Epoch {:04d} | Total Time {:.1f}s'.format(epoch, time() - time0))
 
@@ -214,7 +208,6 @@ def train(args):
 
 def predict(args):
     # GPU / CPU
-    n_gpu = torch.cuda.device_count()
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
     # load data
@@ -224,8 +217,6 @@ def predict(args):
     model = KGAT(args, data.n_users, data.n_entities, data.n_relations)
     model = load_model(model, args.pretrain_model_path)
     model.to(device)
-    if n_gpu > 1:
-        model = nn.DataParallel(model)
 
     # predict
     Ks = eval(args.Ks)

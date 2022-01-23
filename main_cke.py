@@ -69,7 +69,6 @@ def train(args):
     logging.info(args)
 
     # GPU / CPU
-    n_gpu = torch.cuda.device_count()
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
     # load data
@@ -86,8 +85,6 @@ def train(args):
         model = load_model(model, args.pretrain_model_path)
 
     model.to(device)
-    if n_gpu > 1:
-        model = nn.DataParallel(model)
     logging.info(model)
 
     optimizer = optim.Adam(model.parameters(), lr=args.lr)
@@ -181,7 +178,6 @@ def train(args):
 
 def predict(args):
     # GPU / CPU
-    n_gpu = torch.cuda.device_count()
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
     # load data
@@ -191,8 +187,6 @@ def predict(args):
     model = CKE(args, data.n_users, data.n_items, data.n_entities, data.n_relations)
     model = load_model(model, args.pretrain_model_path)
     model.to(device)
-    if n_gpu > 1:
-        model = nn.DataParallel(model)
 
     # predict
     Ks = eval(args.Ks)

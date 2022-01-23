@@ -55,7 +55,7 @@ def parse_nfm_args():
 
     args = parser.parse_args()
 
-    save_dir = 'trained_model/NFM/{}/{}_embeddim{}_{}_lr{}_pretrain{}/'.format(
+    save_dir = 'trained_model/NFM/{}/{}_embed-dim{}_{}_lr{}_pretrain{}/'.format(
         args.data_name, args.model_type, args.embed_dim,
         '-'.join([str(i) for i in eval(args.hidden_dim_list)]), args.lr, args.use_pretrain)
     args.save_dir = save_dir

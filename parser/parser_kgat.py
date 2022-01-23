@@ -23,6 +23,8 @@ def parse_kgat_args():
                         help='CF batch size.')
     parser.add_argument('--kg_batch_size', type=int, default=2048,
                         help='KG batch size.')
+    parser.add_argument('--att_batch_size', type=int, default=4096,
+                        help='Update attention batch size.')
     parser.add_argument('--test_batch_size', type=int, default=10000,
                         help='Test batch size (the user number to test every batch).')
 
@@ -31,7 +33,9 @@ def parse_kgat_args():
     parser.add_argument('--relation_dim', type=int, default=64,
                         help='Relation Embedding size.')
 
-    parser.add_argument('--aggregation_type', nargs='?', default='bi-interaction',
+    parser.add_argument('--laplacian_type', type=str, default='random-walk',
+                        help='Specify the type of the adjacency (laplacian) matrix from {symmetric, random-walk}.')
+    parser.add_argument('--aggregation_type', type=str, default='bi-interaction',
                         help='Specify the type of the aggregation layer from {gcn, graphsage, bi-interaction}.')
     parser.add_argument('--conv_dim_list', nargs='?', default='[64, 32, 16]',
                         help='Output sizes of every aggregation layer.')
@@ -62,8 +66,8 @@ def parse_kgat_args():
 
     args = parser.parse_args()
 
-    save_dir = 'trained_model/KGAT/{}/entitydim{}_relationdim{}_{}_{}_lr{}_pretrain{}/'.format(
-        args.data_name, args.embed_dim, args.relation_dim, args.aggregation_type,
+    save_dir = 'trained_model/KGAT/{}/embed-dim{}_relation-dim{}_{}_{}_{}_lr{}_pretrain{}/'.format(
+        args.data_name, args.embed_dim, args.relation_dim, args.laplacian_type, args.aggregation_type,
         '-'.join([str(i) for i in eval(args.conv_dim_list)]), args.lr, args.use_pretrain)
     args.save_dir = save_dir
 

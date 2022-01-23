@@ -14,6 +14,7 @@ class DataLoaderECFKG(DataLoaderBase):
     def __init__(self, args, logging):
         super().__init__(args, logging)
         self.train_batch_size = args.train_batch_size
+        self.test_batch_size = args.test_batch_size
 
         kg_data = self.load_kg(self.kg_file)
         self.construct_data(kg_data)
