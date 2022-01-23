@@ -61,9 +61,8 @@ class Aggregator(nn.Module):
             bi_embeddings = self.activation(self.linear2(ego_embeddings * side_embeddings))
             embeddings = bi_embeddings + sum_embeddings
 
-        embeddings = self.message_dropout(embeddings)
-        norm_embeddings = F.normalize(embeddings, p=2, dim=1)       # (n_users + n_entities, out_dim)
-        return norm_embeddings
+        embeddings = self.message_dropout(embeddings)           # (n_users + n_entities, out_dim)
+        return embeddings
 
 
 class KGAT(nn.Module):
@@ -81,7 +80,6 @@ class KGAT(nn.Module):
 
         self.A_in = nn.Parameter(A_in)
         self.A_in.requires_grad = False
-        self.att_batch_size = args.att_batch_size
 
         self.embed_dim = args.embed_dim
         self.relation_dim = args.relation_dim
@@ -115,13 +113,13 @@ class KGAT(nn.Module):
 
 
     def calc_cf_embeddings(self):
-        A_in = self.A_in
         ego_embed = self.entity_user_embed.weight
         all_embed = [ego_embed]
 
         for idx, layer in enumerate(self.aggregator_layers):
-            ego_embed = layer(ego_embed, A_in)
-            all_embed.append(ego_embed)
+            ego_embed = layer(ego_embed, self.A_in)
+            norm_embed = F.normalize(ego_embed, p=2, dim=1)
+            all_embed.append(norm_embed)
 
         # Equation (11)
         all_embed = torch.cat(all_embed, dim=1)         # (n_users + n_entities, concat_dim)
@@ -183,44 +181,48 @@ class KGAT(nn.Module):
         return loss
 
 
-    def update_attention_batch(self, h_list, t_list, r_list):
-        r_embed = self.relation_embed(r_list)
-        W_r = self.trans_M[r_list]
+    def update_attention_batch(self, h_list, t_list, r_idx):
+        r_embed = self.relation_embed.weight[r_idx]
+        W_r = self.trans_M[r_idx]
 
-        h_embed = self.entity_user_embed(h_list)
-        t_embed = self.entity_user_embed(t_list)
+        h_embed = self.entity_user_embed.weight[h_list]
+        t_embed = self.entity_user_embed.weight[t_list]
 
         # Equation (4)
-        r_mul_h = torch.bmm(h_embed.unsqueeze(1), W_r).squeeze(1)
-        r_mul_t = torch.bmm(t_embed.unsqueeze(1), W_r).squeeze(1)
-        v_list = torch.sum(r_mul_t * F.tanh(r_mul_h + r_embed), dim=1)
+        r_mul_h = torch.matmul(h_embed, W_r)
+        r_mul_t = torch.matmul(t_embed, W_r)
+        v_list = torch.sum(r_mul_t * torch.tanh(r_mul_h + r_embed), dim=1)
         return v_list
 
 
-    def update_attention(self, h_list, t_list, r_list):
+    def update_attention(self, h_list, t_list, r_list, relations):
         device = self.A_in.device
 
-        v_list = []
-        n_fold = len(h_list) // self.att_batch_size + 1
+        rows = []
+        cols = []
+        values = []
 
-        for i in range(n_fold):
-            start = self.att_batch_size * i
-            end = self.att_batch_size * (i + 1)
+        for r_idx in relations:
+            index_list = torch.where(r_list == r_idx)
+            batch_h_list = h_list[index_list]
+            batch_t_list = t_list[index_list]
 
-            batch_h_list = h_list[start: end].to(device)
-            batch_t_list = t_list[start: end].to(device)
-            batch_r_list = r_list[start: end].to(device)
+            batch_v_list = self.update_attention_batch(batch_h_list, batch_t_list, r_idx)
+            rows.append(batch_h_list)
+            cols.append(batch_t_list)
+            values.append(batch_v_list)
 
-            with torch.no_grad():
-                batch_v_list = self.update_attention_batch(batch_h_list, batch_t_list, batch_r_list)
-            v_list.append(batch_v_list.cpu())
+        rows = torch.cat(rows)
+        cols = torch.cat(cols)
+        values = torch.cat(values)
 
-        # Equation (5)
-        indices = torch.stack([h_list, t_list])
-        values = torch.cat(v_list)
+        indices = torch.stack([rows, cols])
         shape = self.A_in.shape
         A_in = torch.sparse.FloatTensor(indices, values, torch.Size(shape))
-        self.A_in.data = torch.sparse.softmax(A_in, dim=1).to(device)
+
+        # Equation (5)
+        A_in = torch.sparse.softmax(A_in.cpu(), dim=1)
+        self.A_in.data = A_in.to(device)
 
 
     def calc_score(self, user_ids, item_ids):

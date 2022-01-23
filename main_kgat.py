@@ -163,7 +163,11 @@ def train(args):
 
         # update attention
         time5 = time()
-        model(data.h_list, data.t_list, data.r_list, mode='update_att')
+        h_list = data.h_list.to(device)
+        t_list = data.t_list.to(device)
+        r_list = data.r_list.to(device)
+        relations = list(data.laplacian_dict.keys())
+        model(h_list, t_list, r_list, relations, mode='update_att')
         logging.info('Update Attention: Epoch {:04d} | Total Time {:.1f}s'.format(epoch, time() - time5))
 
         logging.info('CF + KG Training: Epoch {:04d} | Total Time {:.1f}s'.format(epoch, time() - time0))
