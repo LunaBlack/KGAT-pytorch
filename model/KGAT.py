@@ -225,8 +225,8 @@ class KGAT(nn.Module):
 
     def calc_score(self, user_ids, item_ids):
         """
-        user_ids:   number of users to evaluate   (n_users)
-        item_ids:   number of items to evaluate   (n_items)
+        user_ids:  (n_users)
+        item_ids:  (n_items)
         """
         all_embed = self.calc_cf_embeddings()           # (n_users + n_entities, concat_dim)
         user_embed = all_embed[user_ids]                # (n_users, concat_dim)

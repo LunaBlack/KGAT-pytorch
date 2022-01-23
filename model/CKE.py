@@ -133,8 +133,8 @@ class CKE(nn.Module):
 
     def calc_score(self, user_ids, item_ids):
         """
-        user_ids:   number of users to evaluate   (n_users)
-        item_ids:   number of items to evaluate   (n_items)
+        user_ids:  (n_users)
+        item_ids:  (n_items)
         """
         user_embed = self.user_embed(user_ids)                  # (n_users, embed_dim)
 
