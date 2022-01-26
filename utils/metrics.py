@@ -117,7 +117,7 @@ def logloss(ground_truth, prediction):
 
 def calc_metrics_at_k(cf_scores, train_user_dict, test_user_dict, user_ids, item_ids, Ks):
     """
-    cf_scores: (n_eval_users, n_eval_items)
+    cf_scores: (n_users, n_items)
     """
     test_pos_item_binary = np.zeros([len(user_ids), len(item_ids)], dtype=np.float32)
     for idx, u in enumerate(user_ids):

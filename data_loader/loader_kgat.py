@@ -30,10 +30,10 @@ class DataLoaderKGAT(DataLoaderBase):
     def construct_data(self, kg_data):
         # add inverse kg data
         n_relations = max(kg_data['r']) + 1
-        reverse_kg_data = kg_data.copy()
-        reverse_kg_data = reverse_kg_data.rename({'h': 't', 't': 'h'}, axis='columns')
-        reverse_kg_data['r'] += n_relations
-        kg_data = pd.concat([kg_data, reverse_kg_data], axis=0, ignore_index=True, sort=False)
+        inverse_kg_data = kg_data.copy()
+        inverse_kg_data = inverse_kg_data.rename({'h': 't', 't': 'h'}, axis='columns')
+        inverse_kg_data['r'] += n_relations
+        kg_data = pd.concat([kg_data, inverse_kg_data], axis=0, ignore_index=True, sort=False)
 
         # re-map user id
         kg_data['r'] += 2
@@ -52,11 +52,11 @@ class DataLoaderKGAT(DataLoaderBase):
         cf2kg_train_data['h'] = self.cf_train_data[0]
         cf2kg_train_data['t'] = self.cf_train_data[1]
 
-        reverse_cf2kg_train_data = pd.DataFrame(np.ones((self.n_cf_train, 3), dtype=np.int32), columns=['h', 'r', 't'])
-        reverse_cf2kg_train_data['h'] = self.cf_train_data[1]
-        reverse_cf2kg_train_data['t'] = self.cf_train_data[0]
+        inverse_cf2kg_train_data = pd.DataFrame(np.ones((self.n_cf_train, 3), dtype=np.int32), columns=['h', 'r', 't'])
+        inverse_cf2kg_train_data['h'] = self.cf_train_data[1]
+        inverse_cf2kg_train_data['t'] = self.cf_train_data[0]
 
-        self.kg_train_data = pd.concat([kg_data, cf2kg_train_data, reverse_cf2kg_train_data], ignore_index=True)
+        self.kg_train_data = pd.concat([kg_data, cf2kg_train_data, inverse_cf2kg_train_data], ignore_index=True)
         self.n_kg_train = len(self.kg_train_data)
 
         # construct kg dict

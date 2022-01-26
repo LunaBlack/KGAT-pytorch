@@ -26,10 +26,10 @@ class DataLoaderCKE(DataLoaderBase):
     def construct_data(self, kg_data):
         # add inverse kg data
         n_relations = max(kg_data['r']) + 1
-        reverse_kg_data = kg_data.copy()
-        reverse_kg_data = reverse_kg_data.rename({'h': 't', 't': 'h'}, axis='columns')
-        reverse_kg_data['r'] += n_relations
-        self.kg_data = pd.concat([kg_data, reverse_kg_data], axis=0, ignore_index=True, sort=False)
+        inverse_kg_data = kg_data.copy()
+        inverse_kg_data = inverse_kg_data.rename({'h': 't', 't': 'h'}, axis='columns')
+        inverse_kg_data['r'] += n_relations
+        self.kg_data = pd.concat([kg_data, inverse_kg_data], axis=0, ignore_index=True, sort=False)
 
         self.n_relations = max(self.kg_data['r']) + 1
         self.n_entities = max(max(self.kg_data['h']), max(kg_data['t'])) + 1
