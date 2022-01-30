@@ -78,9 +78,6 @@ class KGAT(nn.Module):
         self.n_entities = n_entities
         self.n_relations = n_relations
 
-        self.A_in = nn.Parameter(A_in)
-        self.A_in.requires_grad = False
-
         self.embed_dim = args.embed_dim
         self.relation_dim = args.relation_dim
 
@@ -110,6 +107,11 @@ class KGAT(nn.Module):
         self.aggregator_layers = nn.ModuleList()
         for k in range(self.n_layers):
             self.aggregator_layers.append(Aggregator(self.conv_dim_list[k], self.conv_dim_list[k + 1], self.mess_dropout[k], self.aggregation_type))
+
+        self.A_in = nn.Parameter(torch.sparse.FloatTensor(self.n_users + self.n_entities, self.n_users + self.n_entities))
+        if A_in is not None:
+            self.A_in.data = A_in
+        self.A_in.requires_grad = False
 
 
     def calc_cf_embeddings(self):
@@ -142,6 +144,7 @@ class KGAT(nn.Module):
         neg_score = torch.sum(user_embed * item_neg_embed, dim=1)   # (cf_batch_size)
 
         # Equation (13)
+        # cf_loss = F.softplus(neg_score - pos_score)
         cf_loss = (-1.0) * F.logsigmoid(pos_score - neg_score)
         cf_loss = torch.mean(cf_loss)
 
@@ -173,6 +176,7 @@ class KGAT(nn.Module):
         neg_score = torch.sum(torch.pow(r_mul_h + r_embed - r_mul_neg_t, 2), dim=1)     # (kg_batch_size)
 
         # Equation (2)
+        # kg_loss = F.softplus(pos_score - neg_score)
         kg_loss = (-1.0) * F.logsigmoid(neg_score - pos_score)
         kg_loss = torch.mean(kg_loss)
 

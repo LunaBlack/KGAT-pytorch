@@ -1,5 +1,5 @@
 # Knowledge Graph Attention Network
-This is PyTorch & DGL implementation for the paper:
+This is PyTorch implementation for the paper:
 >Xiang Wang, Xiangnan He, Yixin Cao, Meng Liu and Tat-Seng Chua (2019). KGAT: Knowledge Graph Attention Network for Recommendation. [Paper in ACM DL](https://dl.acm.org/authorize.cfm?key=N688414) or [Paper in arXiv](https://arxiv.org/abs/1905.07854). In KDD'19, Anchorage, Alaska, USA, August 4-8, 2019.
 
 You can find Tensorflow implementation by the paper authors [here](https://github.com/xiangwang1223/knowledge_graph_attention_network).
@@ -23,94 +23,87 @@ If you want to use codes and datasets in your research, please contact the paper
 ```
 
 ## Environment Requirement
-The code has been tested running under Python 3.6.8. The required packages are as follows:
-* torch == 1.3.1
-* dgl-cu90 == 0.4.1
-* numpy == 1.15.4
-* pandas == 0.23.1
-* scipy == 1.1.0
-* sklearn == 0.20.0
+The code has been tested running under Python 3.7.10. The required packages are as follows:
+* torch == 1.6.0
+* numpy == 1.21.4
+* pandas == 1.3.5
+* scipy == 1.5.2
+* tqdm == 4.62.3
+* scikit-learn == 1.0.1
 
 ## Run the Codes
 * FM
 ```
-python main_nfm.py --model_type fm --dataset amazon-book
+python main_nfm.py --model_type fm --data_name amazon-book
 ```
 * NFM
 ```
-python main_nfm.py --model_type nfm --dataset amazon-book
+python main_nfm.py --model_type nfm --data_name amazon-book
 ```
-* BPRMF *(train on multi-GPUs)*
+* BPRMF
 ```
-python -m torch.distributed.launch main_bprmf.py --dataset amazon-book
+python main_bprmf.py --data_name amazon-book
 ```
-* ECFKG *(train on multi-GPUs)*
+* ECFKG
 ```
-python -m torch.distributed.launch main_ecfkg.py --dataset amazon-book
+python main_ecfkg.py --data_name amazon-book
 ```
-* CKE *(train on multi-GPUs)*
+* CKE
 ```
-python -m torch.distributed.launch main_cke.py --dataset amazon-book
+python main_cke.py --data_name amazon-book
 ```
 * KGAT
 ```
-python main_kgat.py --dataset amazon-book
+python main_kgat.py --data_name amazon-book
 ```
 
 ## Results
 With my code, following are the results of each model when training with dataset `amazon-book`.
 
-| Model | Valid Data             | Best Epoch | Precision@20         | Recall@20           | NDCG@20             |
-| :---: | :---                   | :---:      | :---:                | :---:               | :---:               |
-| FM    | sample 1000 test users | 65         | 0.014400000683963299 | 0.14490722119808197 | 0.07221827559341328 |
-| NFM   | sample 1000 test users | 56         | 0.013850000686943531 | 0.13833996653556824 | 0.0724611583347469  |
-| BPRMF | all test users         | 65         | 0.014154779163154574 | 0.13356850621872207 | 0.06943918307731874 |
-| ECFKG | all test users         | 41         | 0.013035656309061863 | 0.12247500353257905 | 0.06115661206228789 |
-| CKE   | all test users         | 52         | 0.014507515353912879 | 0.13836056015380443 | 0.07225836488142431 |
-| KGAT  | all test users         | 31         | 0.014817044902584718 | 0.14117674635791852 | 0.07526633940808744 |
-
-Final results on all test users
-
-| Model | Precision@20 | Recall@20 | NDCG@20 |
-| :---: | :---:        | :---:     | :---:   |
-| FM    | 0.0138       | 0.1309    | 0.0676  |
-| NFM   | 0.0131       | 0.1246    | 0.0655  |
-| BPRMF | 0.0142       | 0.1336    | 0.0694  |
-| ECFKG | 0.0130       | 0.1225    | 0.0612  |
-| CKE   | 0.0145       | 0.1384    | 0.0723  |
-| KGAT  | 0.0148       | 0.1412    | 0.0753  |
+| Model                                             | Best Epoch | Precision@20 | Recall@20 | NDCG@20 |
+| :---:                                             | :---:      | :---:        | :---:     | :---:   |
+| FM                                                | 370        | 0.0154       | 0.1478    | 0.0784  |
+| NFM                                               | 140        | 0.0137       | 0.1309    | 0.0696  |
+| BPRMF                                             | 330        | 0.0146       | 0.1395    | 0.0736  |
+| ECFKG                                             |  10        | 0.0134       | 0.1264    | 0.0663  |
+| CKE                                               | 320        | 0.0145       | 0.1394    | 0.0733  |
+| KGAT <br> (agg: bi-interaction; lap: random-walk) | 280        | 0.0150       | 0.1440    | 0.0766  |
+| KGAT <br> (agg: bi-interaction; lap: symmetric)   | 200        | 0.0149       | 0.1428    | 0.0755  |
+| KGAT <br> (agg: graphsage;      lap: random-walk) | 450        | 0.0147       | 0.1430    | 0.0747  |
+| KGAT <br> (agg: graphsage;      lap: symmetric)   | 160        | 0.0146       | 0.1410    | 0.0735  |
+| KGAT <br> (agg: gcn;            lap: random-walk) | 280        | 0.0149       | 0.1440    | 0.0760  |
+| KGAT <br> (agg: gcn;            lap: symmetric)   | 670        | 0.0150       | 0.1448    | 0.0768  |
 
 ## Related Papers
 * FM
-    * Proposed in [Fast context-aware recommendations with factorization machines](https://dl.acm.org/citation.cfm?id=2010002), SIGIR2011.
+    * Proposed in [Fast context-aware recommendations with factorization machines](https://dl.acm.org/citation.cfm?id=2010002), SIGIR 2011.
 
 * NFM
-    * Proposed in [Neural Factorization Machines for Sparse Predictive Analytics](https://dl.acm.org/citation.cfm?id=3080777), SIGIR2017.
+    * Proposed in [Neural Factorization Machines for Sparse Predictive Analytics](https://dl.acm.org/citation.cfm?id=3080777), SIGIR 2017.
 
 * BPRMF
-    * Proposed in [BPR: Bayesian Personalized Ranking from Implicit Feedback](https://dl.acm.org/citation.cfm?id=1795167), UAI2009.
+    * Proposed in [BPR: Bayesian Personalized Ranking from Implicit Feedback](https://dl.acm.org/citation.cfm?id=1795167), UAI 2009.
     * Key point: 
         * Replace point-wise with pair-wise.
 
 * ECFKG
-    * Proposed in [Learning Heterogeneous Knowledge Base Embeddings for Explainable Recommendation](https://arxiv.org/abs/1805.03352), Algorithm2018.
+    * Proposed in [Learning Heterogeneous Knowledge Base Embeddings for Explainable Recommendation](https://arxiv.org/abs/1805.03352), Algorithms 2018.
     * Implementation by the paper authors: [https://github.com/evison/KBE4ExplainableRecommendation](https://github.com/evison/KBE4ExplainableRecommendation)
     * Key point: 
         * Introduce Knowledge Graph to Collaborative Filtering
 
 * CKE
-    * Proposed in [Collaborative Knowledge Base Embedding for Recommender Systems](https://dl.acm.org/citation.cfm?id=2939673), KDD2016.
+    * Proposed in [Collaborative Knowledge Base Embedding for Recommender Systems](https://dl.acm.org/citation.cfm?id=2939673), KDD 2016.
     * Key point: 
         * Leveraging structural content, textual content and visual content from the knowledge base.
-        * Use TransR which is an approach for heterogeneous network, to represent entities and relations in distinct semantic space bridged by relation-specific  matrices.
+        * Use TransR which is an approach for heterogeneous network, to represent entities and relations in distinct semantic space bridged by relation-specific matrices.
         * Performing knowledge base embedding and collaborative filtering jointly.
 
 * KGAT
-    * Proposed in [KGAT: Knowledge Graph Attention Network for Recommendation](https://arxiv.org/abs/1905.07854), KDD2019.
+    * Proposed in [KGAT: Knowledge Graph Attention Network for Recommendation](https://arxiv.org/abs/1905.07854), KDD 2019.
     * Implementation by the paper authors: [https://github.com/xiangwang1223/knowledge_graph_attention_network](https://github.com/xiangwang1223/knowledge_graph_attention_network)
     * Key point:
         * Model the high-order relations in collaborative knowledge graph to provide better recommendation with item side information.
         * Train KG part and CF part in turns.
         
-
 
